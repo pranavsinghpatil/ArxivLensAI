@@ -1,18 +1,19 @@
-
-
 from transformers import pipeline
 import os
 from vector_store import search_faiss
 from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 # ✅ Load the embedding model separately
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")  
+model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-small")
+tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-small")
 
 # Hugging Face text generation model
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 qa_pipeline = pipeline("text2text-generation", model="google/flan-t5-small")  
 
-def generate_answer_huggingface(query, retrieved_chunks, model, tokenizer):
+def generate_answer_huggingface(query, retrieved_chunks):
     print("Retrieved Chunks Type:", type(retrieved_chunks))
     print("Retrieved Chunks Value:", retrieved_chunks)
 

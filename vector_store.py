@@ -1,49 +1,48 @@
 from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
+from concurrent.futures import ThreadPoolExecutor
+import faiss
+import numpy as np
+import pickle
 
-# Load SBERT model
+# ✅ Load SentenceTransformer Model
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
-def generate_embeddings(text_chunks):
-    """Converts text chunks into vector embeddings."""
-    return np.array(model.encode(text_chunks))  # No need for any changes here
+def encode_chunks_parallel(text_chunks):
+    """Encodes text chunks in parallel for better speed."""
+    with ThreadPoolExecutor(max_workers=4) as executor:  # 4 parallel threads
+        embeddings = list(executor.map(model.encode, text_chunks))
+    return np.array(embeddings)
 
-def search_faiss(faiss_index, query, model, chunks, top_k=3):
-    tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-small")  # Or use the correct T5 tokenizer
-
-    # Tokenize the query
-    inputs = tokenizer(query, return_tensors="pt")
-    
-    # Use the model to generate a sequence
-    with torch.no_grad():
-        output = model.generate(**inputs)
-
-    # Decode the generated output
-    generated_query = tokenizer.decode(output[0], skip_special_tokens=True)
-
-    print(f"Generated Query: {generated_query}")
-    
-    # You can now use FAISS to retrieve the top K most relevant chunks based on the generated query
-    # For now, let's use a simple embedding approach, since we're only generating a response:
-    # This part can be extended with FAISS retrieval based on the output of T5.
-    
-    # Assuming faiss_index and chunks are pre-built, this is a placeholder for FAISS retrieval
-    # Your FAISS retrieval logic will go here, based on either embeddings or similarity search.
-    return chunks[:top_k]  # Placeholder for the top-k retrieved chunks
-
-
-def build_faiss_index(model, text_chunks):
-    # Convert each chunk into an embedding
-    embeddings = np.array([model.encode(chunk) for chunk in text_chunks])  # ✅ Remove extra brackets
-    
-    # Ensure correct shape (N, D)
-    if len(embeddings.shape) == 3:  # If shape is (N, 1, D), remove extra dimension
-        embeddings = embeddings.squeeze(1)
-
-    index = faiss.IndexFlatL2(embeddings.shape[1])  # D = embedding size
+def build_faiss_index(text_chunks):
+    """Creates and saves FAISS index faster using parallel encoding."""
+    embeddings = encode_chunks_parallel(text_chunks)
+    index = faiss.IndexFlatL2(embeddings.shape[1])
     index.add(embeddings)
-    
+
+    # ✅ Save FAISS index
+    faiss.write_index(index, "faiss_index.index")
+
+    # ✅ Save chunks
+    with open("chunks.pkl", "wb") as f:
+        pickle.dump(text_chunks, f)
+
     return index, embeddings, text_chunks
+
+def load_faiss_index():
+    """Loads FAISS index and text chunks from file."""
+    index = faiss.read_index("faiss_index.index")  # ✅ Load FAISS index
+    with open("chunks.pkl", "rb") as f:
+        chunks = pickle.load(f)  # ✅ Load chunks
+    return index, chunks
+
+def search_faiss(faiss_index, query, chunks):
+    """Search for the most relevant chunks in FAISS index."""
+    # ✅ Use SentenceTransformer for encoding
+    query_embedding = embedding_model.encode([query])  # Use the SentenceTransformer model
+    query_embedding = np.array(query_embedding)
+    # Search FAISS index
+    _, indices = faiss_index.search(query_embedding, top_k=3)
+
+    return [chunks[i] for i in indices[0] if i < len(chunks)]  # ✅ Return actual retrieved chunks
