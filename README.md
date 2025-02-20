@@ -4,9 +4,9 @@ hello this the full fledged project
 
 🔥 Next Steps (What We Will Implement)
 
-- 1] UI (Streamlit) for PDF Upload & Query Input    
+- 1]cc UI (Streamlit) for PDF Upload & Query Input    
 
-- 2] Extracting Tables, Figures & Diagrams from PDFs (Not just text)
+- 2]cc Extracting Tables, Figures & Diagrams from PDFs (Not just text)
 
 3] Integrating LangChain for Query Processing
 
