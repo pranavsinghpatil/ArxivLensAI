@@ -1,6 +1,7 @@
+
+# extract_text.py
 import fitz  # PyMuPDF
 import re
-
 
 def extract_text_from_pdf(pdf_path):
     """Extracts clean text and tables from a given PDF file using PyMuPDF (fitz)."""

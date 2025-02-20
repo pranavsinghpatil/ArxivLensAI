@@ -1,31 +1,98 @@
+# qa_system.py
 from transformers import pipeline
 import os
 from vector_store import search_faiss
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import google.generativeai as genai
+import torch
 
-# ✅ Load the embedding model separately
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")  
-model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-small")
-tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-small")
+# 🔹 Step 1: Securely Configure Gemini API Key
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # Load from environment variable
+if not GOOGLE_API_KEY:
+    # raise ValueError("⚠️ Missing GOOGLE_API_KEY! Set it in environment variables.")
+    GOOGLE_API_KEY = "AIzaSyAYqEVojzmSLv101fVPvEzDHLhpuR7SYso"
+genai.configure(api_key=GOOGLE_API_KEY)
 
-# Hugging Face text generation model
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
-qa_pipeline = pipeline("text2text-generation", model="google/flan-t5-small")  
+# 🔹 Step 2: Initialize Gemini Model
+gemini_model = genai.GenerativeModel("gemini-pro")
 
-def generate_answer_huggingface(query, retrieved_chunks):
-    print("Retrieved Chunks Type:", type(retrieved_chunks))
-    print("Retrieved Chunks Value:", retrieved_chunks)
+# ✅ Load Embedding Model (Correcting `token` issue)
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token="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")  
 
-    context = " ".join(retrieved_chunks)  # Combine retrieved text
-    prompt = f"Based on the following context, answer the question:\n\n{context}\n\nQuestion: {query}\nAnswer:"
+# ✅ Load Hugging Face Models
+model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-large")
+tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-large")
 
-    # Tokenize the prompt for the model
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+# ✅ Use GPU if available
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
+
+# ✅ Hugging Face QA Pipelines
+# os.environ["HUGGINGFACEHUB_API_TOKEN"] = os.getenv("HFr_API_TOKEN")  # Secure Token
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
+qa_pipeline = pipeline("question-answering", model="distilbert-base-cased-distilled-squad")
+
+# ✅ Robust Retrieval Pipeline with Error Handling
+try:
+    retrieval_pipeline = pipeline(
+        "question-answering",
+        model="deepset/roberta-base-squad2",
+        tokenizer="deepset/roberta-base-squad2"
+    )
+except Exception as e:
+    print(f"⚠️ Retrieval pipeline failed to load: {e}")
+    retrieval_pipeline = None  # Ensure code doesn’t break
+
+# 🔹 Research AI Answer Generation using Gemini
+def generate_research_answer(context, query, retrieved_text):
+    """Uses Gemini to generate research-focused answers based on retrieved text."""
+    prompt = f"""
+    You are an AI research assistant. Answer the user's query based on the research paper.
     
-    # Generate the output
-    output = model.generate(**inputs)
+    **Context from research paper:**
+    {context}
 
-    # Decode the generated answer
-    return tokenizer.decode(output[0], skip_special_tokens=True)
+    **Most relevant extracted text:**
+    {retrieved_text}
 
+    **User's question:**
+    {query}
+
+    Provide a **detailed, research-oriented** response in clear language.
+    """
+    try:
+        response = gemini_model.generate_content(prompt)
+        if response.text.strip():
+            return response.text.strip()
+        return "⚠️ Gemini model returned an empty response."
+    except Exception as e:
+        return f"⚠️ Error generating response: {str(e)}"
+
+# 🔹 Hugging Face Answer Generation
+def generate_answer_huggingface(query, retrieved_chunks):
+    """Processes retrieved text, extracts relevant data, and generates a response using Gemini."""
+    if not retrieved_chunks:
+        return "⚠️ No relevant information found in the research paper."
+
+    # ✅ Combine Retrieved Chunks into Context
+    context = " ".join(retrieved_chunks)
+    print("\n[INFO] Retrieved Context:\n", context, "\n")
+
+    # ✅ Extract Most Relevant Text using Retrieval Model
+    if retrieval_pipeline:
+        try:
+            ret_result = retrieval_pipeline(question=query, context=context)
+            retrieved_text = ret_result['answer']
+            print("\n[INFO] Retrieved Text:\n", retrieved_text, "\n")
+        except Exception as e:
+            print(f"⚠️ Retrieval pipeline error: {e}")
+            retrieved_text = ""
+    else:
+        retrieved_text = ""
+
+    # ✅ Generate Research-Based Answer
+    answer = generate_research_answer(context, query, retrieved_text)
+    print("\n[INFO] Generated Answer:\n", answer, "\n")
+    
+    return answer
