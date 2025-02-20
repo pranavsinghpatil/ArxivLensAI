@@ -18,22 +18,36 @@ hello this the full fledged project
 Here are some possible upgrades—you can choose which ones to prioritize:
 
 🔹 1. Improve Answer Quality
+
 Fine-tune FAISS retrieval to get more relevant chunks
+
 Improve prompting for Gemini/Hugging Face to give structured answers
+
 Use a better model (gemini-1.5, mistral, gpt-4-turbo)
 
+
 🔹 2. Enhance UI (Streamlit)
+
 Better visualization of extracted images & tables
+
 Option to highlight text in retrieved chunks
+
 Add a “Download Answer” button
 
+
 🔹 3. Add Summarization of the Research Paper
+
 Generate concise summaries using Flan-T5 or Gemini
+
 Auto-generate “Key Takeaways” for each section
 
+
 🔹 4. Improve Speed & Performance
+
 Optimize FAISS indexing to reduce processing time
+
 Enable GPU for retrieval & answer generation
+
 Cache embeddings to avoid recomputation
 
 
