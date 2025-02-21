@@ -56,6 +56,7 @@ def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
 
 def clean_text(text):
     """Cleans extracted text by removing extra spaces and fixing line breaks."""
+    text = text.encode("utf-8", "ignore").decode("utf-8")
     text = re.sub(r'\s+', ' ', text)  # Remove multiple spaces
     text = re.sub(r'-\s', '', text)   # Fix hyphenated words
     return text.strip()

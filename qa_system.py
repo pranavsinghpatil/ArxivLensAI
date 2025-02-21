@@ -25,7 +25,8 @@ model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-large")
 tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-large")
 
 # ✅ Use GPU if available
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cpu"
 model.to(device)
 
 # ✅ Hugging Face QA Pipelines
@@ -73,7 +74,12 @@ def generate_research_answer(context, query, retrieved_text):
 def generate_answer_huggingface(query, retrieved_chunks):
     """Processes retrieved text, extracts relevant data, and generates a response using Gemini."""
     if not retrieved_chunks:
-        return "⚠️ No relevant information found in the research paper."
+        return generate_research_answer(
+            context="The research paper does not directly mention this topic.",
+            query=query,
+            retrieved_text="No direct references, but answering based on research principles."
+        )
+
 
     # ✅ Combine Retrieved Chunks into Context
     context = " ".join(retrieved_chunks)

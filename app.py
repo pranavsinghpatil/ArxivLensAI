@@ -11,6 +11,7 @@ from main import process_pdf
 from utils import get_faiss_index_filename, get_chunks_filename
 import pandas as pd
 
+os.environ["PYTHONUTF8"] = "1"
 # ✅ Fix GRPC error
 os.environ["GRPC_DNS_RESOLVER"] = "ares"
 
@@ -30,161 +31,122 @@ os.makedirs(faiss_indexes_dir, exist_ok=True)
 os.makedirs(extracted_images_dir, exist_ok=True)
 os.makedirs(tables_dir, exist_ok=True)
 
+# ✅ Default Research Paper Path
+default_paper_path = os.path.join(temp_dir, "Attention Is All You Need(default_research_paper).pdf")
+# D:\Gits\re\temp\Attention Is All You Need(default_research_paper).pdf
 # ✅ Streamlit UI setup
 st.set_page_config(page_title="📄 AI-Powered Research Assistant", layout="wide")
-
-st.markdown("""
-    <style>
-        .chat-container {
-            background-color: #f0f2f6;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-        }
-        .user-message {
-            background-color: #0084FF;
-            color: white;
-            padding: 10px;
-            border-radius: 15px;
-            margin-bottom: 10px;
-            max-width: 60%;
-        }
-        .ai-message {
-            background-color: #E5E5EA;
-            color: black;
-            padding: 10px;
-            border-radius: 15px;
-            margin-bottom: 10px;
-            max-width: 60%;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 st.title("🤖 AI-Powered Research Assistant")
 
 # 📌 Sidebar - Research Paper Upload
-st.sidebar.header("📄 Upload Your Research Paper")
-uploaded_file = st.sidebar.file_uploader("Upload a PDF", type="pdf")
+st.sidebar.header("📄 Upload Your Research Papers")
+uploaded_files = st.sidebar.file_uploader("Upload PDFs", type="pdf", accept_multiple_files=True)
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-if "index_loaded" not in st.session_state:
-    st.session_state.index_loaded = False
+# ✅ Track uploaded PDFs
+if "selected_papers" not in st.session_state:
+    st.session_state.selected_papers = []
 
-# 📑 Process the uploaded PDF
-if uploaded_file:
-    pdf_path = os.path.join(temp_dir, uploaded_file.name)
-    with open(pdf_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
+# ✅ Process uploaded PDFs
+available_papers = {}
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        pdf_path = os.path.join(temp_dir, uploaded_file.name)
+        with open(pdf_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
 
-    st.sidebar.success("✅ PDF Uploaded Successfully!")
+        st.sidebar.success(f"✅ Uploaded: {uploaded_file.name}")
 
-    # ✅ Ensure FAISS index is built
+        # ✅ Ensure FAISS index is built
+        try:
+            faiss_index_filename = get_faiss_index_filename(pdf_path)
+            faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
+
+            if not os.path.exists(faiss_index_path):
+                st.info(f"🔄 Processing {uploaded_file.name} ...")
+                process_pdf(pdf_path)
+                st.success(f"✅ {uploaded_file.name} processed!")
+
+            # ✅ Store available papers
+            available_papers[uploaded_file.name] = pdf_path
+
+        except Exception as e:
+            st.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
+
+# ✅ Load Default Paper if No Uploads
+if not available_papers:
+    st.sidebar.info("📌 Using Default Research Paper - \n \t Attention Is All You Need")
+    if not os.path.exists(default_paper_path):
+        st.error("⚠️ Default research paper is missing! Please upload a file.")
+    else:
+        available_papers["Attention Is All You Need (Default Paper)"] = default_paper_path
+
+# ✅ Dropdown to Select Research Papers for Assistance
+selected_papers = st.sidebar.multiselect(
+    "📂 Select Research Papers to Assist On",
+    list(available_papers.keys()),
+    default=list(available_papers.keys())  # Select all by default
+)
+
+st.session_state.selected_papers = [available_papers[p] for p in selected_papers]
+
+# ✅ Ensure Selected Papers are Processed
+for pdf_path in st.session_state.selected_papers:
     try:
         faiss_index_filename = get_faiss_index_filename(pdf_path)
         faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
-    
+
         if not os.path.exists(faiss_index_path):
-            st.info("🔄 Processing PDF and building FAISS index... Please wait.")
-            process_pdf(pdf_path)  # ✅ Automatically process the PDF if index is missing
-            st.success("✅ PDF processed & indexed! You can now ask questions.")
+            process_pdf(pdf_path)
 
-        # ✅ Attempt to load FAISS index
-        faiss_index, chunks = load_faiss_index(pdf_path)
-        st.session_state.faiss_index = faiss_index
-        st.session_state.chunks = chunks
-        st.session_state.index_loaded = True
+    except Exception as e:
+        st.error(f"❌ Error processing {pdf_path}: {str(e)}")
 
-    except FileNotFoundError:
-        st.error(f"⚠️ FAISS index or chunks file missing. Attempting to regenerate...")
-        process_pdf(pdf_path)  # 🔄 Reprocess the PDF
+# ✅ Query Input
+query = st.text_input("🔎 Ask a question about the research papers:")
+
+# ✅ Search and Generate Answer
+if query:
+    all_retrieved_chunks = []
+
+    for pdf_path in st.session_state.selected_papers:
         try:
             faiss_index, chunks = load_faiss_index(pdf_path)
-            st.session_state.faiss_index = faiss_index
-            st.session_state.chunks = chunks
-            st.session_state.index_loaded = True
+            retrieved_chunks = search_faiss(query, faiss_index, embedding_model, chunks)
+            all_retrieved_chunks.extend(retrieved_chunks)
         except Exception as e:
-            st.error(f"❌ FAISS index could not be loaded even after regeneration: {str(e)}")
-            st.stop()
+            st.error(f"❌ Error retrieving from {pdf_path}: {str(e)}")
 
+    # ✅ Generate the final answer using Gemini or Hugging Face
+    answer = generate_answer_huggingface(query, all_retrieved_chunks)
 
-    # ✅ Expandable Research Paper Viewer
-    with st.sidebar.expander("📜 View Research Paper Content", expanded=False):
-        with open(pdf_path, "rb") as pdf_file:
-            pdf_bytes = pdf_file.read()
-        st.download_button(label="📥 Download PDF", data=pdf_bytes, file_name=uploaded_file.name, mime="application/pdf")
+    # ✅ Display the retrieved answer
+    st.subheader("🔍 Answer:")
+    st.write(answer)
 
-    # ✅ Load Extracted Tables
+# ✅ Extracted Tables & Images
+for pdf_path in st.session_state.selected_papers:
+    # 📊 Display Extracted Tables
     tables_file = os.path.join(tables_dir, f"tables_{get_faiss_index_filename(pdf_path)}.md")
     if os.path.exists(tables_file):
-        st.subheader("📊 Extracted Tables from Research Paper")
+        st.subheader(f"📊 Extracted Tables from {os.path.basename(pdf_path)}")
         with open(tables_file, "r") as f:
             tables_content = f.read()
             st.markdown(f"```md\n{tables_content}\n```")
 
-    # ✅ Load Extracted Images
+    # 🖼 Display Extracted Images
     image_files = [f for f in os.listdir(extracted_images_dir) if f.startswith(os.path.basename(pdf_path))]
     if image_files:
-        st.subheader("🖼 Extracted Images from Research Paper")
+        st.subheader(f"🖼 Extracted Images from {os.path.basename(pdf_path)}")
         for image_file in image_files:
             image_path = os.path.join(extracted_images_dir, image_file)
             st.image(image_path, caption=f"Extracted Image: {image_file}", use_column_width=True)
 
-    # Load extracted tables
-    tables_file = os.path.join(tables_dir, f"tables_{get_faiss_index_filename(pdf_path)}.pkl")
-    if os.path.exists(tables_file):
-        try:
-            with open(tables_file, 'rb') as f:
-                extracted_tables = pickle.load(f)
-        except Exception as e:
-            st.warning(f"Could not load tables: {str(e)}")
-            extracted_tables = []
-
-# 💬 Chatbot UI
-st.subheader("💡 Ask a Question About the Research Paper")
-query = st.chat_input("Type your question here...")
-
-# Initialize extracted_tables
-extracted_tables = []
-
-if query:
-    st.session_state.chat_history.append({"role": "user", "message": query})
-
-    if not st.session_state.index_loaded:
-        st.error("Please wait for the PDF to be processed.")
-    else:
-        retrieved_chunks = search_faiss(
-            query, 
-            st.session_state.faiss_index, 
-            embedding_model, 
-            st.session_state.chunks
-        )
-
-        # ✅ Check if tables contain relevant answers
-        table_answers = []
-        if os.path.exists(tables_file):
-            with open(tables_file, "r") as f:
-                tables_content = f.read()
-                if query.lower() in tables_content.lower():
-                    table_answers.append(f"📊 Relevant Table Data:\n\n{tables_content}")
-
-        # ✅ Generate the final answer using Gemini or Hugging Face
-        answer = generate_answer_huggingface(query, retrieved_chunks)
-        st.session_state.chat_history.append({"role": "ai", "message": answer})
-
 # 📌 Display Chat History
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
 for chat in st.session_state.chat_history:
     if chat["role"] == "user":
         st.markdown(f"<div class='user-message'>{chat['message']}</div>", unsafe_allow_html=True)
     else:
         st.markdown(f"<div class='ai-message'>{chat['message']}</div>", unsafe_allow_html=True)
-
-# Display tables section
-if extracted_tables:
-    st.subheader("📊 Extracted Tables")
-    for idx, table in enumerate(extracted_tables):
-        st.write(f"Table {idx+1}:")
-        try:
-            st.dataframe(pd.DataFrame(table))
-        except Exception as e:
-            st.error(f"Error displaying table {idx+1}: {str(e)}")
