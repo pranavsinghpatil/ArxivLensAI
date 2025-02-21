@@ -74,11 +74,18 @@ def generate_research_answer(context, query, retrieved_text):
 def generate_answer_huggingface(query, retrieved_chunks):
     """Processes retrieved text, extracts relevant data, and generates a response using Gemini."""
     if not retrieved_chunks:
-        return generate_research_answer(
-            context="The research paper does not directly mention this topic.",
+        # Generate a research-based answer even if no context is found
+        research_fallback_response = generate_research_answer(
+            context="No direct references found in the selected research papers.",
             query=query,
-            retrieved_text="No direct references, but answering based on research principles."
+            retrieved_text="However, based on research principles and general AI knowledge, here is an answer:"
         )
+
+        if research_fallback_response.strip():
+            return research_fallback_response
+        else:
+            return f"⚠️ The research papers do not contain information on {query}, and I couldn't infer a strong response."
+
 
 
     # ✅ Combine Retrieved Chunks into Context

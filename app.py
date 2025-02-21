@@ -1,52 +1,47 @@
+# app.py
+
 from sentence_transformers import SentenceTransformer
 import streamlit as st
-import pickle
+import os
 from qa_system import generate_answer_huggingface
 from vector_store import search_faiss, load_faiss_index
-import subprocess
-import os
-import faiss
-import hashlib
 from main import process_pdf
-from utils import get_faiss_index_filename, get_chunks_filename
-import pandas as pd
+from utils import get_faiss_index_filename, CUSTOM_STYLES, PAGE_STYLES, EXTERNAL_DEPENDENCIES
 
-os.environ["PYTHONUTF8"] = "1"
-# ✅ Fix GRPC error
+# Fix GRPC error
 os.environ["GRPC_DNS_RESOLVER"] = "ares"
 
-# ✅ Load embedding model
+# Load embedding model
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token="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")
 
-# ✅ Set up project directories
+# Set up directories
 project_dir = os.path.dirname(os.path.abspath(__file__))
 temp_dir = os.path.join(project_dir, "temp")
 faiss_indexes_dir = os.path.join(project_dir, "faiss_indexes")
 extracted_images_dir = os.path.join(project_dir, "extracted_images")
 tables_dir = os.path.join(project_dir, "extracted_tables")
 
-# ✅ Ensure directories exist
-os.makedirs(temp_dir, exist_ok=True)
-os.makedirs(faiss_indexes_dir, exist_ok=True)
-os.makedirs(extracted_images_dir, exist_ok=True)
-os.makedirs(tables_dir, exist_ok=True)
+# Ensure directories exist
+for directory in [temp_dir, faiss_indexes_dir, extracted_images_dir, tables_dir]:
+    os.makedirs(directory, exist_ok=True)
 
-# ✅ Default Research Paper Path
+# Default Research Paper
 default_paper_path = os.path.join(temp_dir, "Attention Is All You Need(default_research_paper).pdf")
-# D:\Gits\re\temp\Attention Is All You Need(default_research_paper).pdf
-# ✅ Streamlit UI setup
-st.set_page_config(page_title="📄 AI-Powered Research Assistant", layout="wide")
-st.title("🤖 AI-Powered Research Assistant")
 
-# 📌 Sidebar - Research Paper Upload
-st.sidebar.header("📄 Upload Your Research Papers")
+# Streamlit UI setup
+st.set_page_config(page_title="📄 AI-Powered Research Assistant", layout="wide")
+
+# Apply styles
+st.markdown(EXTERNAL_DEPENDENCIES + PAGE_STYLES + f"<style>{CUSTOM_STYLES}</style>", unsafe_allow_html=True)
+
+# Display Fixed Header
+st.markdown("<h3 style='text-align: center;'>🤖 AI-Powered Research Assistant</h3>", unsafe_allow_html=True)
+
+# Sidebar - Multiple PDF Upload
+st.sidebar.header("📄 Upload Research Papers")
 uploaded_files = st.sidebar.file_uploader("Upload PDFs", type="pdf", accept_multiple_files=True)
 
-# ✅ Track uploaded PDFs
-if "selected_papers" not in st.session_state:
-    st.session_state.selected_papers = []
-
-# ✅ Process uploaded PDFs
+# Store uploaded papers
 available_papers = {}
 if uploaded_files:
     for uploaded_file in uploaded_files:
@@ -54,42 +49,34 @@ if uploaded_files:
         with open(pdf_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
 
-        st.sidebar.success(f"✅ Uploaded: {uploaded_file.name}")
+        st.toast(f"✅ {uploaded_file.name} uploaded!", icon="📄")
 
-        # ✅ Ensure FAISS index is built
         try:
             faiss_index_filename = get_faiss_index_filename(pdf_path)
             faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
 
             if not os.path.exists(faiss_index_path):
-                st.info(f"🔄 Processing {uploaded_file.name} ...")
                 process_pdf(pdf_path)
-                st.success(f"✅ {uploaded_file.name} processed!")
 
-            # ✅ Store available papers
             available_papers[uploaded_file.name] = pdf_path
-
         except Exception as e:
             st.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
 
-# ✅ Load Default Paper if No Uploads
-if not available_papers:
-    st.sidebar.info("📌 Using Default Research Paper - \n \t Attention Is All You Need")
-    if not os.path.exists(default_paper_path):
-        st.error("⚠️ Default research paper is missing! Please upload a file.")
-    else:
-        available_papers["Attention Is All You Need (Default Paper)"] = default_paper_path
+# Load Default Paper if No Uploads
+if not available_papers and os.path.exists(default_paper_path):
+    available_papers["Attention Is All You Need (Default)"] = default_paper_path
+elif not available_papers:
+    st.error("⚠️ Default research paper is missing! Please upload a file.")
 
-# ✅ Dropdown to Select Research Papers for Assistance
+# Dropdown to Select Research Papers
 selected_papers = st.sidebar.multiselect(
-    "📂 Select Research Papers to Assist On",
+    "📂 Select Research Papers",
     list(available_papers.keys()),
-    default=list(available_papers.keys())  # Select all by default
+    default=list(available_papers.keys())
 )
-
 st.session_state.selected_papers = [available_papers[p] for p in selected_papers]
 
-# ✅ Ensure Selected Papers are Processed
+# Process selected papers
 for pdf_path in st.session_state.selected_papers:
     try:
         faiss_index_filename = get_faiss_index_filename(pdf_path)
@@ -97,17 +84,46 @@ for pdf_path in st.session_state.selected_papers:
 
         if not os.path.exists(faiss_index_path):
             process_pdf(pdf_path)
-
     except Exception as e:
         st.error(f"❌ Error processing {pdf_path}: {str(e)}")
 
-# ✅ Query Input
-query = st.text_input("🔎 Ask a question about the research papers:")
+# Initialize chat history
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# ✅ Search and Generate Answer
+# Chat UI
+chat_container = st.container()
+chat_container.markdown('<div class="chat-container">', unsafe_allow_html=True)
+
+# Display Chat History (Bottom to Top)
+for chat in reversed(st.session_state.chat_history):
+    if chat["role"] == "user":
+        st.markdown(f'<div class="user-message">{chat["message"]}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="bot-message">{chat["message"]}</div>', unsafe_allow_html=True)
+
+chat_container.markdown('</div>', unsafe_allow_html=True)
+
+# Fixed Chat Input
+st.markdown("""
+    <div class="chat-input-wrapper">
+        <div class="chat-input-container">
+            <input type="text" class="chat-input" placeholder="Type your message..." id="chat-input">
+            <button class="send-button">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+# Hidden Streamlit input for handling the chat
+query = st.text_input("", key="hidden_input", label_visibility="collapsed")
+
+# Handle chat interactions
 if query:
-    all_retrieved_chunks = []
+    st.session_state.chat_history.append({"role": "user", "message": query})
 
+    all_retrieved_chunks = []
     for pdf_path in st.session_state.selected_papers:
         try:
             faiss_index, chunks = load_faiss_index(pdf_path)
@@ -116,37 +132,9 @@ if query:
         except Exception as e:
             st.error(f"❌ Error retrieving from {pdf_path}: {str(e)}")
 
-    # ✅ Generate the final answer using Gemini or Hugging Face
+    # Generate answer
     answer = generate_answer_huggingface(query, all_retrieved_chunks)
+    st.session_state.chat_history.append({"role": "ai", "message": answer})
 
-    # ✅ Display the retrieved answer
-    st.subheader("🔍 Answer:")
-    st.write(answer)
-
-# ✅ Extracted Tables & Images
-for pdf_path in st.session_state.selected_papers:
-    # 📊 Display Extracted Tables
-    tables_file = os.path.join(tables_dir, f"tables_{get_faiss_index_filename(pdf_path)}.md")
-    if os.path.exists(tables_file):
-        st.subheader(f"📊 Extracted Tables from {os.path.basename(pdf_path)}")
-        with open(tables_file, "r") as f:
-            tables_content = f.read()
-            st.markdown(f"```md\n{tables_content}\n```")
-
-    # 🖼 Display Extracted Images
-    image_files = [f for f in os.listdir(extracted_images_dir) if f.startswith(os.path.basename(pdf_path))]
-    if image_files:
-        st.subheader(f"🖼 Extracted Images from {os.path.basename(pdf_path)}")
-        for image_file in image_files:
-            image_path = os.path.join(extracted_images_dir, image_file)
-            st.image(image_path, caption=f"Extracted Image: {image_file}", use_column_width=True)
-
-# 📌 Display Chat History
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-for chat in st.session_state.chat_history:
-    if chat["role"] == "user":
-        st.markdown(f"<div class='user-message'>{chat['message']}</div>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"<div class='ai-message'>{chat['message']}</div>", unsafe_allow_html=True)
+    # Refresh UI
+    st.rerun()
