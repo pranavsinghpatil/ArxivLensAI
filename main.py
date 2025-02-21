@@ -4,7 +4,6 @@ import sys
 import os
 import shutil
 from extract_text import extract_text_from_pdf, extract_tables_from_pdf, extract_images_from_pdf
-# from vector_store import build_faiss_index
 from utils import get_faiss_index_filename, get_chunks_filename
 
 # Ensure necessary directories exist
@@ -15,13 +14,14 @@ os.makedirs(faiss_indexes_dir, exist_ok=True)
 os.makedirs(extracted_images_dir, exist_ok=True)
 
 def process_pdf(pdf_path, force_reprocess=False):
-    """Processes a PDF, extracts text, and builds a FAISS index."""
+    """Processes a PDF, extracts text, tables, images, and builds a FAISS index."""
     
     from vector_store import build_faiss_index  # ✅ Import inside function to avoid circular import
     
     faiss_index_filename = get_faiss_index_filename(pdf_path)
-    faiss_index_path = os.path.join("faiss_indexes", faiss_index_filename)
-    
+    faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
+    tables_file = os.path.join(faiss_indexes_dir, f"tables_{faiss_index_filename}.md")
+
     if not force_reprocess and os.path.exists(faiss_index_path):
         print(f"[INFO] FAISS index already exists: {faiss_index_path}. Skipping index building.")
         return  
@@ -33,6 +33,17 @@ def process_pdf(pdf_path, force_reprocess=False):
         return
     text_chunks = text.split(". ")
 
+    print("[INFO] Extracting tables...")
+    with open(tables_file, "w") as f:
+        for page_number in range(10):  # Extract tables from first 10 pages
+            table_text = extract_tables_from_pdf(pdf_path, page_number)
+            if table_text:
+                f.write(f"\n## Page {page_number + 1} Tables:\n{table_text}\n")
+
+    print("[INFO] Extracting images...")
+    image_paths = extract_images_from_pdf(pdf_path, extracted_images_dir)
+    print(f"[INFO] Extracted {len(image_paths)} images.")
+
     print("[INFO] Building FAISS index...")
     faiss_index, embeddings, chunks = build_faiss_index(text_chunks, pdf_path)
 
@@ -42,6 +53,8 @@ def process_pdf(pdf_path, force_reprocess=False):
     faiss.write_index(faiss_index, faiss_index_path)
 
     print(f"[SUCCESS] FAISS index saved to {faiss_index_path}.")
+    print(f"[SUCCESS] Extracted tables saved to {tables_file}.")
+    print(f"[SUCCESS] Images saved to {extracted_images_dir}.")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

@@ -9,6 +9,7 @@ import faiss
 import hashlib
 from main import process_pdf
 from utils import get_faiss_index_filename, get_chunks_filename
+import pandas as pd
 
 # ✅ Fix GRPC error
 os.environ["GRPC_DNS_RESOLVER"] = "ares"
@@ -30,16 +31,49 @@ os.makedirs(extracted_images_dir, exist_ok=True)
 os.makedirs(tables_dir, exist_ok=True)
 
 # ✅ Streamlit UI setup
-st.title("📄 AI-Powered Research Assistant")
-st.sidebar.header("Upload Your Research Paper")
+st.set_page_config(page_title="📄 AI-Powered Research Assistant", layout="wide")
 
-# ✅ PDF Upload Section
-uploaded_file = st.sidebar.file_uploader("Upload a Research Paper (PDF)", type="pdf")
+st.markdown("""
+    <style>
+        .chat-container {
+            background-color: #f0f2f6;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .user-message {
+            background-color: #0084FF;
+            color: white;
+            padding: 10px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            max-width: 60%;
+        }
+        .ai-message {
+            background-color: #E5E5EA;
+            color: black;
+            padding: 10px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            max-width: 60%;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
+st.title("🤖 AI-Powered Research Assistant")
+
+# 📌 Sidebar - Research Paper Upload
+st.sidebar.header("📄 Upload Your Research Paper")
+uploaded_file = st.sidebar.file_uploader("Upload a PDF", type="pdf")
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "index_loaded" not in st.session_state:
+    st.session_state.index_loaded = False
+
+# 📑 Process the uploaded PDF
 if uploaded_file:
-    # ✅ Save the uploaded PDF temporarily
     pdf_path = os.path.join(temp_dir, uploaded_file.name)
-
     with open(pdf_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
@@ -49,26 +83,36 @@ if uploaded_file:
     try:
         faiss_index_filename = get_faiss_index_filename(pdf_path)
         faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
-
+    
         if not os.path.exists(faiss_index_path):
-            from main import process_pdf
             st.info("🔄 Processing PDF and building FAISS index... Please wait.")
             process_pdf(pdf_path)  # ✅ Automatically process the PDF if index is missing
             st.success("✅ PDF processed & indexed! You can now ask questions.")
 
-        # ✅ Load FAISS index and chunks
+        # ✅ Attempt to load FAISS index
+        faiss_index, chunks = load_faiss_index(pdf_path)
+        st.session_state.faiss_index = faiss_index
+        st.session_state.chunks = chunks
+        st.session_state.index_loaded = True
+
+    except FileNotFoundError:
+        st.error(f"⚠️ FAISS index or chunks file missing. Attempting to regenerate...")
+        process_pdf(pdf_path)  # 🔄 Reprocess the PDF
         try:
             faiss_index, chunks = load_faiss_index(pdf_path)
             st.session_state.faiss_index = faiss_index
             st.session_state.chunks = chunks
             st.session_state.index_loaded = True
-        except FileNotFoundError:
-            st.error("⚠️ FAISS index could not be loaded. Please re-upload the PDF.")
+        except Exception as e:
+            st.error(f"❌ FAISS index could not be loaded even after regeneration: {str(e)}")
             st.stop()
 
-    except Exception as e:
-        st.error(f"❌ An error occurred: {str(e)}")
-        st.stop()
+
+    # ✅ Expandable Research Paper Viewer
+    with st.sidebar.expander("📜 View Research Paper Content", expanded=False):
+        with open(pdf_path, "rb") as pdf_file:
+            pdf_bytes = pdf_file.read()
+        st.download_button(label="📥 Download PDF", data=pdf_bytes, file_name=uploaded_file.name, mime="application/pdf")
 
     # ✅ Load Extracted Tables
     tables_file = os.path.join(tables_dir, f"tables_{get_faiss_index_filename(pdf_path)}.md")
@@ -86,16 +130,29 @@ if uploaded_file:
             image_path = os.path.join(extracted_images_dir, image_file)
             st.image(image_path, caption=f"Extracted Image: {image_file}", use_column_width=True)
 
-# ✅ Query Input
-query = st.text_input("🔎 Ask a question about the research paper:")
+    # Load extracted tables
+    tables_file = os.path.join(tables_dir, f"tables_{get_faiss_index_filename(pdf_path)}.pkl")
+    if os.path.exists(tables_file):
+        try:
+            with open(tables_file, 'rb') as f:
+                extracted_tables = pickle.load(f)
+        except Exception as e:
+            st.warning(f"Could not load tables: {str(e)}")
+            extracted_tables = []
 
-if st.button("Get Answer", key="get_answer_button") and query:
-    if uploaded_file is None:
-        st.error("Please upload a PDF first.")
-    elif not st.session_state.get("index_loaded", False):
+# 💬 Chatbot UI
+st.subheader("💡 Ask a Question About the Research Paper")
+query = st.chat_input("Type your question here...")
+
+# Initialize extracted_tables
+extracted_tables = []
+
+if query:
+    st.session_state.chat_history.append({"role": "user", "message": query})
+
+    if not st.session_state.index_loaded:
         st.error("Please wait for the PDF to be processed.")
     else:
-        # ✅ Search FAISS index
         retrieved_chunks = search_faiss(
             query, 
             st.session_state.faiss_index, 
@@ -113,12 +170,21 @@ if st.button("Get Answer", key="get_answer_button") and query:
 
         # ✅ Generate the final answer using Gemini or Hugging Face
         answer = generate_answer_huggingface(query, retrieved_chunks)
+        st.session_state.chat_history.append({"role": "ai", "message": answer})
 
-        # ✅ Display the retrieved answer
-        st.subheader("🔍 Answer:")
-        st.write(answer)
+# 📌 Display Chat History
+for chat in st.session_state.chat_history:
+    if chat["role"] == "user":
+        st.markdown(f"<div class='user-message'>{chat['message']}</div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='ai-message'>{chat['message']}</div>", unsafe_allow_html=True)
 
-        # ✅ Display table answers if relevant
-        if table_answers:
-            st.subheader("📊 Additional Relevant Table Data:")
-            st.markdown("\n\n".join(table_answers))
+# Display tables section
+if extracted_tables:
+    st.subheader("📊 Extracted Tables")
+    for idx, table in enumerate(extracted_tables):
+        st.write(f"Table {idx+1}:")
+        try:
+            st.dataframe(pd.DataFrame(table))
+        except Exception as e:
+            st.error(f"Error displaying table {idx+1}: {str(e)}")
