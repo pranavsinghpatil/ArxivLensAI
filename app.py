@@ -1,47 +1,48 @@
-# app.py
-
+#app.py
 from sentence_transformers import SentenceTransformer
 import streamlit as st
-import os
+import pickle
 from qa_system import generate_answer_huggingface
 from vector_store import search_faiss, load_faiss_index
+import os
+import faiss
 from main import process_pdf
-from utils import get_faiss_index_filename, CUSTOM_STYLES, PAGE_STYLES, EXTERNAL_DEPENDENCIES
+from utils import get_faiss_index_filename, get_chunks_filename
+import pandas as pd
 
-# Fix GRPC error
+# ✅ Fix GRPC error
 os.environ["GRPC_DNS_RESOLVER"] = "ares"
 
-# Load embedding model
+# ✅ Load embedding model
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token="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")
 
-# Set up directories
+# ✅ Set up directories
 project_dir = os.path.dirname(os.path.abspath(__file__))
 temp_dir = os.path.join(project_dir, "temp")
 faiss_indexes_dir = os.path.join(project_dir, "faiss_indexes")
 extracted_images_dir = os.path.join(project_dir, "extracted_images")
 tables_dir = os.path.join(project_dir, "extracted_tables")
 
-# Ensure directories exist
-for directory in [temp_dir, faiss_indexes_dir, extracted_images_dir, tables_dir]:
-    os.makedirs(directory, exist_ok=True)
+# ✅ Ensure directories exist
+os.makedirs(temp_dir, exist_ok=True)
+os.makedirs(faiss_indexes_dir, exist_ok=True)
+os.makedirs(extracted_images_dir, exist_ok=True)
+os.makedirs(tables_dir, exist_ok=True)
 
-# Default Research Paper
+# ✅ Default Research Paper
 default_paper_path = os.path.join(temp_dir, "Attention Is All You Need(default_research_paper).pdf")
 
-# Streamlit UI setup
+# ✅ Streamlit UI setup
 st.set_page_config(page_title="📄 AI-Powered Research Assistant", layout="wide")
 
-# Apply styles
-st.markdown(EXTERNAL_DEPENDENCIES + PAGE_STYLES + f"<style>{CUSTOM_STYLES}</style>", unsafe_allow_html=True)
-
-# Display Fixed Header
+# ✅ Display Fixed Header
 st.markdown("<h3 style='text-align: center;'>🤖 AI-Powered Research Assistant</h3>", unsafe_allow_html=True)
 
-# Sidebar - Multiple PDF Upload
+# 📌 Sidebar - Multiple PDF Upload
 st.sidebar.header("📄 Upload Research Papers")
 uploaded_files = st.sidebar.file_uploader("Upload PDFs", type="pdf", accept_multiple_files=True)
 
-# Store uploaded papers
+# ✅ Store uploaded papers
 available_papers = {}
 if uploaded_files:
     for uploaded_file in uploaded_files:
@@ -49,8 +50,10 @@ if uploaded_files:
         with open(pdf_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
 
+        # ✅ Show notification instead of sidebar clutter
         st.toast(f"✅ {uploaded_file.name} uploaded!", icon="📄")
 
+        # ✅ Process PDF if necessary
         try:
             faiss_index_filename = get_faiss_index_filename(pdf_path)
             faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
@@ -62,13 +65,15 @@ if uploaded_files:
         except Exception as e:
             st.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
 
-# Load Default Paper if No Uploads
-if not available_papers and os.path.exists(default_paper_path):
-    available_papers["Attention Is All You Need (Default)"] = default_paper_path
-elif not available_papers:
-    st.error("⚠️ Default research paper is missing! Please upload a file.")
+# ✅ Load Default Paper if No Uploads
+if not available_papers:
+    st.sidebar.info("📌 Using Default Research Paper - \n \t Attention Is All You Need")
+    if os.path.exists(default_paper_path):
+        available_papers["Attention Is All You Need (Default)"] = default_paper_path
+    else:
+        st.error("⚠️ Default research paper is missing! Please upload a file.")
 
-# Dropdown to Select Research Papers
+# ✅ Dropdown to Select Research Papers
 selected_papers = st.sidebar.multiselect(
     "📂 Select Research Papers",
     list(available_papers.keys()),
@@ -76,7 +81,7 @@ selected_papers = st.sidebar.multiselect(
 )
 st.session_state.selected_papers = [available_papers[p] for p in selected_papers]
 
-# Process selected papers
+# ✅ Ensure Selected Papers are Processed
 for pdf_path in st.session_state.selected_papers:
     try:
         faiss_index_filename = get_faiss_index_filename(pdf_path)
@@ -84,44 +89,33 @@ for pdf_path in st.session_state.selected_papers:
 
         if not os.path.exists(faiss_index_path):
             process_pdf(pdf_path)
+
     except Exception as e:
         st.error(f"❌ Error processing {pdf_path}: {str(e)}")
 
-# Initialize chat history
+# ✅ Initialize chat history
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Chat UI
+# ✅ Chatbot UI - Display Messages
 chat_container = st.container()
-chat_container.markdown('<div class="chat-container">', unsafe_allow_html=True)
 
-# Display Chat History (Bottom to Top)
-for chat in reversed(st.session_state.chat_history):
-    if chat["role"] == "user":
-        st.markdown(f'<div class="user-message">{chat["message"]}</div>', unsafe_allow_html=True)
+# ✅ Display Chat History (Bottom to Top)
+for message in st.session_state.chat_history:
+    if message["role"] == "user":
+        st.chat_message("user", avatar=os.path.join(project_dir, "icons", "user-icon.png")).markdown(message["content"])
     else:
-        st.markdown(f'<div class="bot-message">{chat["message"]}</div>', unsafe_allow_html=True)
+        st.chat_message("assistant", avatar=os.path.join(project_dir, "icons", "bot-icon.png")).markdown(message["content"])
 
-chat_container.markdown('</div>', unsafe_allow_html=True)
+# ✅ Chat Input (Fixed at Bottom)
+query = st.chat_input("Ask your question here...")
 
-# Fixed Chat Input
-st.markdown("""
-    <div class="chat-input-wrapper">
-        <div class="chat-input-container">
-            <input type="text" class="chat-input" placeholder="Type your message..." id="chat-input">
-            <button class="send-button">
-                <i class="fas fa-paper-plane"></i>
-            </button>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
-
-# Hidden Streamlit input for handling the chat
-query = st.text_input("", key="hidden_input", label_visibility="collapsed")
-
-# Handle chat interactions
+# ✅ Search and Generate Answer
 if query:
-    st.session_state.chat_history.append({"role": "user", "message": query})
+    # ✅ Display user message in chat message container
+    st.chat_message("user", avatar=os.path.join(project_dir, "icons", "user-icon.png")).markdown(query)
+    # ✅ Add user message to chat history
+    st.session_state.chat_history.append({"role": "user", "content": query})
 
     all_retrieved_chunks = []
     for pdf_path in st.session_state.selected_papers:
@@ -132,9 +126,13 @@ if query:
         except Exception as e:
             st.error(f"❌ Error retrieving from {pdf_path}: {str(e)}")
 
-    # Generate answer
+    # ✅ Generate the final answer
     answer = generate_answer_huggingface(query, all_retrieved_chunks)
-    st.session_state.chat_history.append({"role": "ai", "message": answer})
 
-    # Refresh UI
+    # ✅ Display assistant response in chat message container
+    st.chat_message("assistant", avatar=os.path.join(project_dir, "icons", "bot-icon.png")).markdown(answer)
+    # ✅ Add assistant response to chat history
+    st.session_state.chat_history.append({"role": "assistant", "content": answer})
+
+    # ✅ Refresh UI
     st.rerun()

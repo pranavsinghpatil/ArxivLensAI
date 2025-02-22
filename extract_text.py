@@ -1,3 +1,4 @@
+# extract_text.py
 import fitz  # PyMuPDF for text & image extraction
 import pdfplumber  # For structured table extraction
 import re
