@@ -4,7 +4,8 @@ import faiss
 import numpy as np
 import pickle
 import hashlib
-from utils import get_faiss_index_filename
+from utils import get_faiss_index_filename, expand_query
+import streamlit as st
 import os
 # ✅ Load Model Once
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token="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")
@@ -70,31 +71,44 @@ def load_faiss_index(pdf_path):
 
     return index, chunks
 
+def search_faiss(query, faiss_index, embedding_model, chunks, memory, k=5):
+    """
+    Searches FAISS index for the most relevant chunks based on the query.
+    Includes query expansion and threshold-based filtering.
 
-def search_faiss(query, faiss_index, embedding_model, chunks):
-    """Searches FAISS index for the most relevant chunks based on the query."""
-    
-    # Ensure FAISS index is valid
+    Args:
+        query (str): User's search query.
+        faiss_index (faiss.Index): The FAISS index for fast retrieval.
+        embedding_model (SentenceTransformer): The sentence embedding model.
+        chunks (list): List of text chunks.
+        memory (list): Chat history for query expansion.
+        k (int, optional): Number of top results to retrieve. Defaults to 5.
+
+    Returns:
+        list: The most relevant retrieved text chunks.
+    """
+
     if faiss_index is None:
-        raise ValueError("FAISS index is not loaded. Please process the PDF first.")
-    
-    # Check if query is a string and encode it properly
-    if isinstance(query, str):  # Ensure query is a string
-        query_embedding = embedding_model.encode([query])  # Pass it as a list of 1 string
-    else:
-        raise ValueError("Query must be a string.")
-    
-    # Convert to NumPy format if necessary
-    query_embedding = np.array(query_embedding).astype("float32")
+        raise ValueError("❌ FAISS index is not loaded. Please process the PDF first.")
 
-    # Perform the FAISS search
-    D, I = faiss_index.search(query_embedding, k=5)  # Retrieve top 5 results
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("❌ Query must be a non-empty string.")
 
-    # Filter out low-confidence results (if FAISS distance is too high)
-    threshold = np.percentile(D[0], 75)  # Increase to 75th percentile
+    # ✅ Expand query using past user interactions
+    expanded_query = expand_query(query, memory)
+    
+    # ✅ Encode the expanded query
+    query_embedding = embedding_model.encode([expanded_query], convert_to_numpy=True).astype("float32")
+
+    # ✅ Perform the FAISS search
+    D, I = faiss_index.search(query_embedding, k)
+
+    # ✅ Apply dynamic thresholding to filter low-confidence results
+    if D.size == 0 or I.size == 0:
+        return ["I couldn't find relevant information."]
+
+    # Compute the threshold dynamically (percentile-based filtering)
+    threshold = np.percentile(D[0], 75)  # Consider the top 25% of results
     filtered_chunks = [chunks[i] for i, d in zip(I[0], D[0]) if i < len(chunks) and d < threshold]
 
-    if not filtered_chunks:  # If no good results, return a fallback message
-        return ["I couldn't find relevant information."]
-    
-    return filtered_chunks
+    return filtered_chunks if filtered_chunks else ["I couldn't find relevant information."]

@@ -7,8 +7,9 @@ from vector_store import search_faiss, load_faiss_index
 import os
 import faiss
 from main import process_pdf
-from utils import get_faiss_index_filename, get_chunks_filename
+from utils import get_faiss_index_filename, get_chunks_filename, full_context_keywords
 import pandas as pd
+from fuzzywuzzy import process
 
 # ✅ Fix GRPC error
 os.environ["GRPC_DNS_RESOLVER"] = "ares"
@@ -34,6 +35,9 @@ default_paper_path = os.path.join(temp_dir, "Attention Is All You Need(default_r
 
 # ✅ Streamlit UI setup
 st.set_page_config(page_title="📄 AI-Powered Research Assistant", layout="wide")
+
+if "memory" not in st.session_state:
+    st.session_state.memory = []
 
 # ✅ Display Fixed Header
 st.markdown("<h3 style='text-align: center;'>🤖 AI-Powered Research Assistant</h3>", unsafe_allow_html=True)
@@ -100,39 +104,65 @@ if "chat_history" not in st.session_state:
 # ✅ Chatbot UI - Display Messages
 chat_container = st.container()
 
-# ✅ Display Chat History (Bottom to Top)
-for message in st.session_state.chat_history:
+# ✅ Chat Input (Fixed at Bottom)
+query = st.chat_input("Ask your question here...")
+
+# Initialize conversation history if not already present
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
+
+# Display conversation history
+for message in st.session_state.conversation_history:
     if message["role"] == "user":
         st.chat_message("user", avatar=os.path.join(project_dir, "icons", "user-icon.png")).markdown(message["content"])
     else:
         st.chat_message("assistant", avatar=os.path.join(project_dir, "icons", "bot-icon.png")).markdown(message["content"])
 
-# ✅ Chat Input (Fixed at Bottom)
-query = st.chat_input("Ask your question here...")
+def is_full_context_query(query, keywords, threshold=80):
+    """Detects if the query is asking for full context using fuzzy matching."""
+    matches = process.extract(query.lower(), keywords, limit=len(keywords))
+    best_match = max(matches, key=lambda x: x[1])
+    return best_match[1] >= threshold
 
 # ✅ Search and Generate Answer
 if query:
-    # ✅ Display user message in chat message container
+    # Display user message in chat message container
     st.chat_message("user", avatar=os.path.join(project_dir, "icons", "user-icon.png")).markdown(query)
-    # ✅ Add user message to chat history
+    # Add user message to chat history
     st.session_state.chat_history.append({"role": "user", "content": query})
+    st.session_state.conversation_history.append({"role": "user", "content": query})
+
+    # Detect full context queries
+    full_context = is_full_context_query(query, full_context_keywords)
 
     all_retrieved_chunks = []
+    previous_queries = [entry["content"] for entry in st.session_state.memory if entry["role"] == "user"]
+
+    # Merge past queries to enhance context
+    query_context = " ".join(previous_queries[-3:])  # Last 3 queries for context
+    query_with_memory = f"{query_context} {query}" if query_context else query
+
     for pdf_path in st.session_state.selected_papers:
         try:
             faiss_index, chunks = load_faiss_index(pdf_path)
-            retrieved_chunks = search_faiss(query, faiss_index, embedding_model, chunks)
-            all_retrieved_chunks.extend(retrieved_chunks)
+            if full_context:
+                # If full context is needed, use all chunks
+                all_retrieved_chunks.extend(chunks)
+            else:
+                retrieved_chunks = search_faiss(query, faiss_index, embedding_model, chunks, st.session_state.memory)
+                all_retrieved_chunks.extend(retrieved_chunks)
         except Exception as e:
             st.error(f"❌ Error retrieving from {pdf_path}: {str(e)}")
 
-    # ✅ Generate the final answer
-    answer = generate_answer_huggingface(query, all_retrieved_chunks)
+    # Generate the final answer
+    answer = generate_answer_huggingface(query, retrieved_chunks, st.session_state.memory, full_context=full_context)
 
-    # ✅ Display assistant response in chat message container
+
+    # Display assistant response in chat message container
     st.chat_message("assistant", avatar=os.path.join(project_dir, "icons", "bot-icon.png")).markdown(answer)
-    # ✅ Add assistant response to chat history
+    # Add assistant response to chat history
     st.session_state.chat_history.append({"role": "assistant", "content": answer})
+    st.session_state.conversation_history.append({"role": "assistant", "content": answer})
 
-    # ✅ Refresh UI
+    # Refresh UI
     st.rerun()
