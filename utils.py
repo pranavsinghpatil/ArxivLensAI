@@ -1,10 +1,5 @@
 # utils.py
-
-# import faiss
-# import pickle
-# import os
 import hashlib
-# import sys
 import nltk
 from nltk.corpus import wordnet
 

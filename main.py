@@ -1,10 +1,9 @@
-# main.py
 import faiss
 import pickle
 import sys
 import os
 import shutil
-from extract_text import extract_text_from_pdf, extract_tables_from_pdf, extract_images_from_pdf
+from extract_text import extract_text_from_pdf, extract_tables_from_pdf, extract_text_from_images
 from utils import get_faiss_index_filename, get_chunks_filename
 
 # Ensure necessary directories exist
@@ -16,16 +15,17 @@ os.makedirs(extracted_images_dir, exist_ok=True)
 
 def process_pdf(pdf_path, force_reprocess=False):
     """Processes a PDF, extracts text, tables, images, and builds a FAISS index."""
-    
+
     from vector_store import build_faiss_index  # ✅ Import inside function to avoid circular import
-    
+
     faiss_index_filename = get_faiss_index_filename(pdf_path)
     faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
     tables_file = os.path.join(faiss_indexes_dir, f"tables_{faiss_index_filename}.md")
+    image_texts_file = os.path.join(faiss_indexes_dir, f"image_texts_{faiss_index_filename}.txt")
 
     if not force_reprocess and os.path.exists(faiss_index_path):
         print(f"[INFO] FAISS index already exists: {faiss_index_path}. Skipping index building.")
-        return  
+        return
 
     print("[INFO] Extracting text from PDF...")
     text = extract_text_from_pdf(pdf_path)
@@ -45,6 +45,11 @@ def process_pdf(pdf_path, force_reprocess=False):
     image_paths = extract_images_from_pdf(pdf_path, extracted_images_dir)
     print(f"[INFO] Extracted {len(image_paths)} images.")
 
+    # Extract text from images and save to a file
+    image_texts = extract_text_from_images(image_paths)
+    with open(image_texts_file, "w") as f:
+        f.write("\n".join(image_texts))
+
     print("[INFO] Building FAISS index...")
     faiss_index, embeddings, chunks = build_faiss_index(text_chunks, pdf_path)
 
@@ -56,6 +61,7 @@ def process_pdf(pdf_path, force_reprocess=False):
     print(f"[SUCCESS] FAISS index saved to {faiss_index_path}.")
     print(f"[SUCCESS] Extracted tables saved to {tables_file}.")
     print(f"[SUCCESS] Images saved to {extracted_images_dir}.")
+    print(f"[SUCCESS] Image texts saved to {image_texts_file}.")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

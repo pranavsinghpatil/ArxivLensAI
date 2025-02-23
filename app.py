@@ -7,6 +7,7 @@ from vector_store import search_faiss, load_faiss_index
 import os
 import faiss
 from main import process_pdf
+from extract_text import extract_text_from_images
 from utils import get_faiss_index_filename, get_chunks_filename, full_context_keywords
 import pandas as pd
 from fuzzywuzzy import process
@@ -125,6 +126,7 @@ def is_full_context_query(query, keywords, threshold=80):
     return best_match[1] >= threshold
 
 # ✅ Search and Generate Answer
+# Search and Generate Answer
 if query:
     # Display user message in chat message container
     st.chat_message("user", avatar=os.path.join(project_dir, "icons", "user-icon.png")).markdown(query)
@@ -154,9 +156,30 @@ if query:
         except Exception as e:
             st.error(f"❌ Error retrieving from {pdf_path}: {str(e)}")
 
-    # Generate the final answer
-    answer = generate_answer_huggingface(query, retrieved_chunks, st.session_state.memory, full_context=full_context)
+    # Inside the query response generation section
+    # Inside the query response generation section
 
+    # Load text from images
+    image_texts_file = os.path.join(faiss_indexes_dir, f"image_texts_{faiss_index_filename}.txt")
+    if os.path.exists(image_texts_file):
+        with open(image_texts_file, "r") as f:
+            image_texts = f.read().splitlines()
+    else:
+        image_texts = []
+
+    # Load text from tables
+    tables_file = os.path.join(faiss_indexes_dir, f"tables_{faiss_index_filename}.md")
+    if os.path.exists(tables_file):
+        with open(tables_file, "r") as f:
+            table_texts = f.read().split("\n## Page")  # Split by page headers to separate tables
+    else:
+        table_texts = []
+
+    # Generate the final answer with the combined context
+    answer = generate_answer_huggingface(query, all_retrieved_chunks, st.session_state.memory, image_texts, table_texts, full_context=full_context)
+
+    # Generate the final answer
+    # answer = generate_answer_huggingface(query, all_retrieved_chunks, st.session_state.memory, full_context=full_context)
 
     # Display assistant response in chat message container
     st.chat_message("assistant", avatar=os.path.join(project_dir, "icons", "bot-icon.png")).markdown(answer)

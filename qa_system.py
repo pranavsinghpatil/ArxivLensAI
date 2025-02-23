@@ -115,16 +115,18 @@ def generate_research_answer(context, query, retrieved_text):
 
 
 # 🔹 Hugging Face Answer Generation
-def generate_answer_huggingface(query, retrieved_chunks, memory, full_context=False):
+def generate_answer_huggingface(query, retrieved_chunks, memory, image_texts, table_texts, full_context=False):
     """
     Processes retrieved text, extracts relevant data, and generates a response using Gemini.
-    
+
     Args:
         query (str): User's query.
         retrieved_chunks (list): Retrieved text chunks from FAISS.
         memory (list): Chat memory for past user interactions.
+        image_texts (list): Text extracted from images.
+        table_texts (list): Text extracted from tables.
         full_context (bool, optional): If True, uses full document context. Defaults to False.
-    
+
     Returns:
         str: Generated response.
     """
@@ -151,22 +153,25 @@ def generate_answer_huggingface(query, retrieved_chunks, memory, full_context=Fa
     # ✅ Step 5: Modify query with past context
     query_with_memory = f"Considering our past discussion: {past_context}. Now, {query}" if past_context else query
 
-    # ✅ Step 6: Extract Most Relevant Text using Retrieval Model (if available)
+    # ✅ Step 6: Combine text from images and tables with the main context
+    combined_context = f"{context} {' '.join(image_texts)} {' '.join(table_texts)}"
+
+    # ✅ Step 7: Extract Most Relevant Text using Retrieval Model (if available)
     retrieved_text = ""
     if retrieval_pipeline:
         try:
-            ret_result = retrieval_pipeline(question=query_with_memory, context=context)
+            ret_result = retrieval_pipeline(question=query_with_memory, context=combined_context)
             retrieved_text = ret_result.get('answer', "")
         except Exception as e:
             print(f"⚠️ Retrieval pipeline error: {e}")
 
-    # ✅ Step 7: Generate Research-Based Answer
-    answer = generate_research_answer(context, query_with_memory, retrieved_text)
+    # ✅ Step 8: Generate Research-Based Answer
+    answer = generate_research_answer(combined_context, query_with_memory, retrieved_text)
 
-    # ✅ Step 8: Ensure answer has enough depth (≥ 450 words)
+    # ✅ Step 9: Ensure answer has enough depth (≥ 450 words)
     if len(answer.split()) < 450:
         additional_context = "To provide a more comprehensive response, let's explore additional insights."
-        enriched_answer = generate_research_answer(context, query, retrieved_text + " " + additional_context)
+        enriched_answer = generate_research_answer(combined_context, query, retrieved_text + " " + additional_context)
         if len(enriched_answer.split()) > 450:
             answer = enriched_answer
 
