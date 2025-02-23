@@ -176,3 +176,4 @@ def generate_answer_huggingface(query, retrieved_chunks, memory, image_texts, ta
             answer = enriched_answer
 
     return answer
+

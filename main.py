@@ -3,7 +3,7 @@ import pickle
 import sys
 import os
 import shutil
-from extract_text import extract_text_from_pdf, extract_tables_from_pdf, extract_text_from_images
+from extract_text import extract_text_from_pdf, extract_tables_from_pdf, extract_images_from_pdf, extract_text_from_images
 from utils import get_faiss_index_filename, get_chunks_filename
 
 # Ensure necessary directories exist

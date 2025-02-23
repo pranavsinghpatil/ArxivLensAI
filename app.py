@@ -8,7 +8,7 @@ import os
 import faiss
 from main import process_pdf
 from extract_text import extract_text_from_images
-from utils import get_faiss_index_filename, get_chunks_filename, full_context_keywords
+from utils import get_faiss_index_filename, get_chunks_filename, full_context_keywords #, sidebar_footer
 import pandas as pd
 from fuzzywuzzy import process
 
@@ -85,6 +85,8 @@ selected_papers = st.sidebar.multiselect(
     default=list(available_papers.keys())
 )
 st.session_state.selected_papers = [available_papers[p] for p in selected_papers]
+
+# st.sidebar.markdown(sidebar_footer, unsafe_allow_html=True)
 
 # ✅ Ensure Selected Papers are Processed
 for pdf_path in st.session_state.selected_papers:
@@ -177,6 +179,7 @@ if query:
 
     # Generate the final answer with the combined context
     answer = generate_answer_huggingface(query, all_retrieved_chunks, st.session_state.memory, image_texts, table_texts, full_context=full_context)
+
 
     # Generate the final answer
     # answer = generate_answer_huggingface(query, all_retrieved_chunks, st.session_state.memory, full_context=full_context)
