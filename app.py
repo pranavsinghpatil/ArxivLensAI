@@ -25,12 +25,13 @@ temp_dir = os.path.join(project_dir, "temp")
 faiss_indexes_dir = os.path.join(project_dir, "faiss_indexes")
 extracted_images_dir = os.path.join(project_dir, "extracted_images")
 tables_dir = os.path.join(project_dir, "extracted_tables")
-
+static_dir = os.path.join(project_dir, "static")
 # ✅ Ensure directories exist
 os.makedirs(temp_dir, exist_ok=True)
 os.makedirs(faiss_indexes_dir, exist_ok=True)
 os.makedirs(extracted_images_dir, exist_ok=True)
 os.makedirs(tables_dir, exist_ok=True)
+os.makedirs(static_dir, exist_ok=True)
 
 # ✅ Default Research Paper
 default_paper_path = os.path.join(temp_dir, "Attention Is All You Need(default_research_paper).pdf")
@@ -176,9 +177,9 @@ if "conversation_history" not in st.session_state:
 # Display conversation history
 for message in st.session_state.conversation_history:
     if message["role"] == "user":
-        st.chat_message("user", avatar=os.path.join(project_dir, "icons", "user-icon.png")).markdown(message["content"])
+        st.chat_message("user", avatar=os.path.join(static_dir, "icons", "user-icon.png")).markdown(message["content"])
     else:
-        st.chat_message("assistant", avatar=os.path.join(project_dir, "icons", "bot-icon.png")).markdown(message["content"])
+        st.chat_message("assistant", avatar=os.path.join(static_dir, "icons", "bot-icon.png")).markdown(message["content"])
 
 def is_full_context_query(query, keywords, threshold=80):
     """Detects if the query is asking for full context using fuzzy matching."""
@@ -189,13 +190,13 @@ def is_full_context_query(query, keywords, threshold=80):
 # ✅ Search and Generate Answer
 if query:
     # Display user message in chat message container
-    st.chat_message("user", avatar=os.path.join(project_dir, "icons", "user-icon.png")).markdown(query)
+    st.chat_message("user", avatar=os.path.join(static_dir, "icons", "user-icon.png")).markdown(query)
     # Add user message to chat history
     st.session_state.chat_history.append({"role": "user", "content": query})
     st.session_state.conversation_history.append({"role": "user", "content": query})
 
     # Display assistant message with spinner while processing
-    with st.chat_message("assistant", avatar=os.path.join(project_dir, "icons", "bot-icon.png")):
+    with st.chat_message("assistant", avatar=os.path.join(static_dir, "icons", "bot-icon.png")):
         with st.spinner("Thinking..."):
             # Detect full context queries
             full_context = is_full_context_query(query, full_context_keywords)
