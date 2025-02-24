@@ -89,7 +89,7 @@ st.session_state.selected_papers = [available_papers[p] for p in selected_papers
 #------------------------------------------------------------
 if not GOOGLE_API_KEY or not HUGGINGFACE_API_KEY:
     st.sidebar.markdown("---")
-    st.sidebar.info("Enter both API keys to proceed.", icon='⛷️')
+    st.sidebar.info("Enter both API keys to proceed.", icon='⬇️')
 
     # Google AI API key input
     gapi_key = st.sidebar.text_input(
@@ -117,23 +117,22 @@ if not GOOGLE_API_KEY or not HUGGINGFACE_API_KEY:
         st.session_state["hapi_key"] = hapi_key
 
     # Optional: Validate the API keys
-    if gapi_key and not gapi_key.startswith("AIza"):
-        st.sidebar.warning("Please enter a valid Google AI API key!", icon="⚠️")
+    if gapi_key and hapi_key and gapi_key.startswith("AIza") and hapi_key.startswith("hf_"):
+        st.sidebar.success("Both API keys have been entered successfully!", icon='✅')
+        embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token=hapi_key)
 
-    if hapi_key and not hapi_key.startswith("hf_"):
+    elif gapi_key and not gapi_key.startswith("AIza"):
+        st.sidebar.warning("Please enter a valid Google AI API key!", icon="⚠️")
+    elif gapi_key and gapi_key.startswith("AIza"):
+        st.sidebar.info("Google AI API key entered. Waiting for Hugging Face API key.")
+
+    elif hapi_key and not hapi_key.startswith("hf_"):
         st.sidebar.warning("Please enter a valid Hugging Face API key!", icon="⚠️")
+    elif hapi_key and hapi_key.startswith("hf_"):
+        st.sidebar.info("Hugging Face API key entered. Waiting for Google AI API key.")
 
     # Set API keys in qa_system
     set_api_keys(gapi_key, hapi_key)
-
-    if gapi_key and hapi_key:
-        st.sidebar.success("Both API keys have been entered successfully!", icon='✅')
-        embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token=hapi_key)
-    elif gapi_key:
-        st.sidebar.info("Google AI API key entered. Waiting for Hugging Face API key.")
-    elif hapi_key:
-        st.sidebar.info("Hugging Face API key entered. Waiting for Google AI API key.")
-
 else:
     st.sidebar.markdown("---")
     st.sidebar.success('API key already provided!', icon='✅')
