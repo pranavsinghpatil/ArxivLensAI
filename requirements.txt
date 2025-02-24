@@ -3,6 +3,7 @@ streamlit-float
 sentence-transformers
 fitz
 faiss-cpu
+frontend
 fuzzywuzzy
 python-levenshtein
 pandas
