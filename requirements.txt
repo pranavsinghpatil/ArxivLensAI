@@ -1,6 +1,7 @@
 streamlit
 streamlit-float
 sentence-transformers
+fitz
 faiss-cpu
 fuzzywuzzy
 python-levenshtein
