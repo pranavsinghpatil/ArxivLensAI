@@ -7,33 +7,40 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import google.generativeai as genai
 import torch
 import streamlit as st
+from utils import GOOGLE_API_KEY, HUGGINGFACE_API_KEY
+
+# Initialize API keys from config or use placeholders
+google_api_key = GOOGLE_API_KEY
+huggingface_api_key = HUGGINGFACE_API_KEY
+
+def set_api_keys(gapi_key=None, hapi_key=None):
+    """Set API keys if provided."""
+    global google_api_key, huggingface_api_key
+    if gapi_key:
+        google_api_key = gapi_key
+    if hapi_key:
+        huggingface_api_key = hapi_key
 
 # 🔹 Step 1: Securely Configure Gemini API Key
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # Load from environment variable
-if not GOOGLE_API_KEY:
-    # raise ValueError("⚠️ Missing GOOGLE_API_KEY! Set it in environment variables.")
-    GOOGLE_API_KEY = "AIzaSyAYqEVojzmSLv101fVPvEzDHLhpuR7SYso"
-genai.configure(api_key=GOOGLE_API_KEY)
+if google_api_key:
+    genai.configure(api_key=google_api_key)
 
 # 🔹 Step 2: Initialize Gemini Model
-gemini_model = genai.GenerativeModel("gemini-pro")
-
-# ✅ Load Embedding Model (Correcting `token` issue)
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token="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")  
+gemini_model = genai.GenerativeModel("gemini-pro") if google_api_key else None
 
 # ✅ Load Hugging Face Models
 model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-large")
 tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-large")
 
 # ✅ Use GPU if available
-# device = "cuda" if torch.cuda.is_available() else "cpu"
-device = "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
 
 # ✅ Hugging Face QA Pipelines
-# os.environ["HUGGINGFACEHUB_API_TOKEN"] = os.getenv("HFr_API_TOKEN")  # Secure Token
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 qa_pipeline = pipeline("question-answering", model="distilbert-base-cased-distilled-squad")
+
+# ✅ Load Embedding Model
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token=huggingface_api_key) if huggingface_api_key else None
 
 # ✅ Robust Retrieval Pipeline with Error Handling
 try:
