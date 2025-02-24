@@ -9,6 +9,7 @@ import torch
 import streamlit as st
 from utils import GOOGLE_API_KEY, HUGGINGFACE_API_KEY
 
+torch.classes.__path__ = []
 # Initialize API keys from config or use placeholders
 google_api_key = GOOGLE_API_KEY
 huggingface_api_key = HUGGINGFACE_API_KEY

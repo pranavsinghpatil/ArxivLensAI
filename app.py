@@ -17,7 +17,7 @@ import time
 os.environ["GRPC_DNS_RESOLVER"] = "ares"
 
 # ✅ Load embedding model
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token="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")
+embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", token=HUGGINGFACE_API_KEY) if HUGGINGFACE_API_KEY else None
 
 # ✅ Set up directories
 project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -89,7 +89,7 @@ st.session_state.selected_papers = [available_papers[p] for p in selected_papers
 #------------------------------------------------------------
 if not GOOGLE_API_KEY or not HUGGINGFACE_API_KEY:
     st.sidebar.markdown("---")
-    st.sidebar.info("Enter both API keys to proceed.")
+    st.sidebar.info("Enter both API keys to proceed.", icon='⛷️')
 
     # Google AI API key input
     gapi_key = st.sidebar.text_input(
@@ -127,11 +127,12 @@ if not GOOGLE_API_KEY or not HUGGINGFACE_API_KEY:
     set_api_keys(gapi_key, hapi_key)
 
     if gapi_key and hapi_key:
-        st.sidebar.success("Both API keys have been entered successfully!")
+        st.sidebar.success("Both API keys have been entered successfully!", icon='✅')
+        embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token=hapi_key)
     elif gapi_key:
-        st.sidebar.info("Google AI API key entered. Hugging Face API key is missing.")
+        st.sidebar.info("Google AI API key entered. Waiting for Hugging Face API key.")
     elif hapi_key:
-        st.sidebar.info("Hugging Face API key entered. Google AI API key is missing.")
+        st.sidebar.info("Hugging Face API key entered. Waiting for Google AI API key.")
 
 else:
     st.sidebar.markdown("---")

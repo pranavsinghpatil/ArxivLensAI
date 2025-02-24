@@ -1,12 +1,12 @@
 import faiss
 import pickle
-import sys
 import os
-import shutil
+import sys
 from extract_text import extract_text_from_pdf, extract_tables_from_pdf, extract_images_from_pdf, extract_text_from_images
 from utils import get_faiss_index_filename, get_chunks_filename
+from vector_store import build_faiss_index
 
-# Ensure necessary directories exist
+# Directory setup
 project_dir = os.path.dirname(os.path.abspath(__file__))
 faiss_indexes_dir = os.path.join(project_dir, "faiss_indexes")
 extracted_images_dir = os.path.join(project_dir, "extracted_images")
@@ -14,9 +14,7 @@ os.makedirs(faiss_indexes_dir, exist_ok=True)
 os.makedirs(extracted_images_dir, exist_ok=True)
 
 def process_pdf(pdf_path, force_reprocess=False):
-    """Processes a PDF, extracts text, tables, images, and builds a FAISS index."""
-
-    from vector_store import build_faiss_index  # ✅ Import inside function to avoid circular import
+    """Processes a PDF to extract text, tables, images, and builds a FAISS index."""
 
     faiss_index_filename = get_faiss_index_filename(pdf_path)
     faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
