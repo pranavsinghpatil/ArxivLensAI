@@ -9,6 +9,7 @@ python-levenshtein
 pandas
 numpy
 torch
+tools
 transformers
 Pillow
 accelerate
