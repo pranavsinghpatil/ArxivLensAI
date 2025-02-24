@@ -1,10 +1,10 @@
 # utils.py
 import hashlib
-import nltk
-from nltk.corpus import wordnet
+#import nltk
+#from nltk.corpus import wordnet
 import os
 
-nltk.download("wordnet")
+#nltk.download("wordnet")
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "")
