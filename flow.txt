@@ -1,4 +1,4 @@
-Thank you for sharing your project files. Let's go through each file and analyze the code to understand its functionality and identify areas where we can add features or make improvements.
+
 
 ### Overview of the Project
 
