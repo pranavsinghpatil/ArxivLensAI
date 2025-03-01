@@ -2,21 +2,35 @@ import fitz  # PyMuPDF for text & image extraction
 import pdfplumber  # For structured table extraction
 import re
 import os
-import pytesseract
+#import pytesseract
 from PIL import Image
+from paddleocr import PaddleOCR
 
 def extract_text_from_images(image_paths):
-    """Extracts text from images using OCR."""
+    """Extracts text from images using PaddleOCR instead of Tesseract."""
+    ocr = PaddleOCR(use_angle_cls=True, lang="en")
     extracted_texts = []
+    
     for image_path in image_paths:
-        try:
-            image = Image.open(image_path)
-            text = pytesseract.image_to_string(image)
-            if text:  # Ensure text is not None or empty
-                extracted_texts.append(text)
-        except Exception as e:
-            print(f"Error extracting text from {image_path}: {e}")
+        result = ocr.ocr(image_path, cls=True)
+        text = " ".join([word_info[1][0] for line in result for word_info in line])
+        if text.strip():
+            extracted_texts.append(text)
+
     return extracted_texts
+
+#def extract_text_from_images(image_paths):
+#    """Extracts text from images using OCR."""
+#    extracted_texts = []
+#    for image_path in image_paths:
+#        try:
+#            image = Image.open(image_path)
+#            text = pytesseract.image_to_string(image)
+#            if text:  # Ensure text is not None or empty
+#                extracted_texts.append(text)
+#        except Exception as e:
+#            print(f"Error extracting text from {image_path}: {e}")
+#    return extracted_texts
 
 def extract_tables_from_pdf(pdf_path, page_number):
     """Extracts tables from a specific page using pdfplumber and parses them into structured data."""
