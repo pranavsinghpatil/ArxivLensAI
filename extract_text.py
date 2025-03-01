@@ -1,3 +1,6 @@
+
+
+
 import fitz  # PyMuPDF for text & image extraction
 import pdfplumber  # For structured table extraction
 import re
@@ -46,7 +49,10 @@ def extract_text_from_pdf(pdf_path):
 
     for page_num, page in enumerate(doc):
         # Extract plain text
-        page_text = page.get_text("text") or ""
+        page_text = page.get_text("text")
+        if page_text is None:
+            print(f"Warning: No text extracted from page {page_num + 1}")
+            page_text = ""
 
         # Extract tables (using pdfplumber)
         table_text = extract_tables_from_pdf(pdf_path, page_num) or ""
