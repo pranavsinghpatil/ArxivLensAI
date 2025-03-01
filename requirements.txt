@@ -1,5 +1,6 @@
 frontend
 tools
+google.cloud
 Pillow
 accelerate==1.3.0
 cachetools==5.5.2
