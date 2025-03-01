@@ -1,6 +1,3 @@
-
-
-
 import fitz  # PyMuPDF for text & image extraction
 import pdfplumber  # For structured table extraction
 import re
@@ -13,6 +10,9 @@ def extract_text_from_images(image_paths):
     extracted_texts = []
     for image_path in image_paths:
         try:
+            if not os.path.exists(image_path):
+                print(f"Image path does not exist: {image_path}")
+                continue
             image = Image.open(image_path)
             text = pytesseract.image_to_string(image)
             if text:  # Ensure text is not None or empty
@@ -25,6 +25,9 @@ def extract_tables_from_pdf(pdf_path, page_number):
     """Extracts tables from a specific page using pdfplumber and parses them into structured data."""
     tables = []
     try:
+        if not os.path.exists(pdf_path):
+            print(f"PDF path does not exist: {pdf_path}")
+            return ""
         with pdfplumber.open(pdf_path) as pdf:
             if page_number < len(pdf.pages):
                 table_page = pdf.pages[page_number]
@@ -40,6 +43,9 @@ def extract_tables_from_pdf(pdf_path, page_number):
 def extract_text_from_pdf(pdf_path):
     """Extracts clean text and tables from a given PDF file."""
     try:
+        if not os.path.exists(pdf_path):
+            print(f"PDF path does not exist: {pdf_path}")
+            return ""
         doc = fitz.open(pdf_path)  # Open the PDF
     except Exception as e:
         print(f"Error opening PDF {pdf_path}: {e}")
@@ -76,6 +82,9 @@ def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
     os.makedirs(output_folder, exist_ok=True)
     image_paths = []
     try:
+        if not os.path.exists(pdf_path):
+            print(f"PDF path does not exist: {pdf_path}")
+            return []
         doc = fitz.open(pdf_path)
         for page_num, page in enumerate(doc, start=1):
             for img_index, img in enumerate(page.get_images(full=True)):
