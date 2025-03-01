@@ -4,39 +4,24 @@ import re
 import os
 import pytesseract
 from PIL import Image
-from google.cloud import vision
-import io
 
-def extract_text_from_images_gcv(image_paths):
-    """Extracts text from images using Google Cloud Vision API."""
-    client = vision.ImageAnnotatorClient()
+def extract_text_from_images(image_paths):
+    """Extracts text from images using OCR."""
     extracted_texts = []
-
     for image_path in image_paths:
         try:
-            with io.open(image_path, 'rb') as image_file:
-                content = image_file.read()
-
-            image = vision.Image(content=content)
-            response = client.text_detection(image=image)
-            texts = response.text_annotations
-
-            for text in texts:
-                extracted_texts.append(text.description)
-
+            image = Image.open(image_path)
+            text = pytesseract.image_to_string(image)
+            if text:  # Ensure text is not None or empty
+                extracted_texts.append(text)
         except Exception as e:
             print(f"Error extracting text from {image_path}: {e}")
-
     return extracted_texts
-
 
 def extract_tables_from_pdf(pdf_path, page_number):
     """Extracts tables from a specific page using pdfplumber and parses them into structured data."""
     tables = []
     try:
-        if not os.path.exists(pdf_path):
-            print(f"PDF path does not exist: {pdf_path}")
-            return ""
         with pdfplumber.open(pdf_path) as pdf:
             if page_number < len(pdf.pages):
                 table_page = pdf.pages[page_number]
@@ -52,9 +37,6 @@ def extract_tables_from_pdf(pdf_path, page_number):
 def extract_text_from_pdf(pdf_path):
     """Extracts clean text and tables from a given PDF file."""
     try:
-        if not os.path.exists(pdf_path):
-            print(f"PDF path does not exist: {pdf_path}")
-            return ""
         doc = fitz.open(pdf_path)  # Open the PDF
     except Exception as e:
         print(f"Error opening PDF {pdf_path}: {e}")
@@ -64,10 +46,7 @@ def extract_text_from_pdf(pdf_path):
 
     for page_num, page in enumerate(doc):
         # Extract plain text
-        page_text = page.get_text("text")
-        if page_text is None:
-            print(f"Warning: No text extracted from page {page_num + 1}")
-            page_text = ""
+        page_text = page.get_text("text") or ""
 
         # Extract tables (using pdfplumber)
         table_text = extract_tables_from_pdf(pdf_path, page_num) or ""
@@ -91,9 +70,6 @@ def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
     os.makedirs(output_folder, exist_ok=True)
     image_paths = []
     try:
-        if not os.path.exists(pdf_path):
-            print(f"PDF path does not exist: {pdf_path}")
-            return []
         doc = fitz.open(pdf_path)
         for page_num, page in enumerate(doc, start=1):
             for img_index, img in enumerate(page.get_images(full=True)):
