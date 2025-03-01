@@ -1,7 +1,7 @@
 frontend
 tools
 Pillow
-paddleocr
+Paddle
 accelerate==1.3.0
 cachetools==5.5.2
 faiss-cpu==1.10.0
