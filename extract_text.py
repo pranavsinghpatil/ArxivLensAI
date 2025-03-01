@@ -4,22 +4,31 @@ import re
 import os
 import pytesseract
 from PIL import Image
+from google.cloud import vision
+import io
 
-def extract_text_from_images(image_paths):
-    """Extracts text from images using OCR."""
+def extract_text_from_images_gcv(image_paths):
+    """Extracts text from images using Google Cloud Vision API."""
+    client = vision.ImageAnnotatorClient()
     extracted_texts = []
+
     for image_path in image_paths:
         try:
-            if not os.path.exists(image_path):
-                print(f"Image path does not exist: {image_path}")
-                continue
-            image = Image.open(image_path)
-            text = pytesseract.image_to_string(image)
-            if text:  # Ensure text is not None or empty
-                extracted_texts.append(text)
+            with io.open(image_path, 'rb') as image_file:
+                content = image_file.read()
+
+            image = vision.Image(content=content)
+            response = client.text_detection(image=image)
+            texts = response.text_annotations
+
+            for text in texts:
+                extracted_texts.append(text.description)
+
         except Exception as e:
             print(f"Error extracting text from {image_path}: {e}")
+
     return extracted_texts
+
 
 def extract_tables_from_pdf(pdf_path, page_number):
     """Extracts tables from a specific page using pdfplumber and parses them into structured data."""
