@@ -1,6 +1,6 @@
 frontend
 tools
-google.cloud
+google-cloud-vision==3.4.1 
 Pillow
 accelerate==1.3.0
 cachetools==5.5.2
