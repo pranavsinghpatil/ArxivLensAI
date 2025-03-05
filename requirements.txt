@@ -1,8 +1,8 @@
 frontend
 tools
 Pillow
-paddlepaddle==2.3.0
-paddleocr==2.3.0
+paddlepaddle==2.6.0  # Use a compatible version
+paddleocr==2.7.0.6   # Ensure this version is compatible with the above paddlepaddle version
 accelerate==1.3.0
 cachetools==5.5.2
 faiss-cpu==1.10.0
