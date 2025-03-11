@@ -1,7 +1,8 @@
 # ArxivLensAI 🚀
 
-![ArxivLensAI](https://img.shields.io/badge/Status-Active-brightgreen) ![License](https://img.shields.io/badge/License-MIT-blue) ![Contributions](https://img.shields.io/badge/PRs-Welcome-orange)
+![ArxivLensAI](https://img.shields.io/badge/Status-Active-brightgreen) ![License](https://img.shields.io/badge/License-MIT-blue) ![Contributions](https://img.shields.io/badge/PRs-Welcome-orange) 
 
+![Stars](https://img.shields.io/github/stars/pranavsinghpatil/ArxivLensAI)  ![Forks](https://img.shields.io/github/forks/pranavsinghpatil/ArxivLensAI) 
 > **ArxivLensAI: The Future of Research Interaction**  
 > ArxivLensAI is an innovative AI-powered research assistant designed to revolutionize the way researchers, students, and tech enthusiasts interact with academic content. By transforming static research papers into dynamic, interactive Q&A experiences, ArxivLensAI empowers users to delve deeper into complex topics with ease and precision.
 
@@ -20,7 +21,7 @@
 - **User-Centric Design:** Enjoy a sleek, intuitive interface crafted for a seamless research experience.
 
 
-
+---
 ## 🚀 Getting Started
 
 ### 1️⃣ Clone the Repository
@@ -75,7 +76,7 @@ Explore the powerful interface through our curated screenshots:
 ![Answer](static/screenshots/answer.png)
 
 
-
+---
 ## 📂 Project Architecture
 
 A modular design ensures scalability and ease of maintenance:
@@ -98,7 +99,7 @@ ArxivLensAI/
 └── temp/                 # Temporary file storage
 ```
 
-
+---
 
 ## 🔧 Configuration
 
@@ -113,6 +114,7 @@ ArxivLensAI/
 - QA model: `google/flan-t5-large`
 - Retrieval model: `deepset/roberta-base-squad2`
 
+---
 ## 🎯 Features in Detail
 
 ### PDF Processing
@@ -133,7 +135,7 @@ ArxivLensAI/
 - Supports batch processing for better performance
 
 
-
+---
 ## 🔮 Roadmap & Future Enhancements
 
 We're continuously evolving ArxivLensAI. Upcoming features include:
@@ -145,7 +147,7 @@ We're continuously evolving ArxivLensAI. Upcoming features include:
 - **Community-Driven Innovations:** Incorporate user feedback and contributions to shape future releases.
 
 
-
+---
 ## 🤝 Contributing
 
 We welcome contributions from developers and researchers alike. Here’s how you can join our journey:
@@ -157,13 +159,13 @@ We welcome contributions from developers and researchers alike. Here’s how you
 
 For more details, please refer to our [Contribution Guidelines](CONTRIBUTING.md).
 
-
+---
 
 ## 📜 License
 
 ArxivLensAI is released under the **MIT License**. See the [LICENSE](LICENSE) file for complete details.
 
-
+---
 
 ## 💬 Join the Conversation
 
@@ -171,7 +173,7 @@ Stay updated and get involved:
 
 [![GitHub](https://img.shields.io/badge/Visit-GitHub-black?style=for-the-badge&logo=github)](https://github.com/pranavsinghpatil/ArxivLensAI) [![Twitter](https://img.shields.io/badge/Follow-Twitter-blue?style=for-the-badge&logo=twitter)](https://x.com/syntaxnomad)
 
-
+---
 
 ## 📚 Additional Resources
 
@@ -179,7 +181,7 @@ Stay updated and get involved:
 - **User Guide:** Refer to the [User Guide](docs/USER_GUIDE.md) for a complete walkthrough.
 - **API Reference:** Check out the [API Reference](docs/API_REFERENCE.md) for integration details.
 
-
+---
 
 ## 🛠️ Setup & Maintenance Tips
 
@@ -189,6 +191,7 @@ For a seamless setup experience, note the following:
 - **Dependency Updates:** Regularly update your dependencies to stay compatible with the latest features.
 - **Community Support:** Engage with our community for troubleshooting and feature discussions.
 
+---
 ## Project Files Descriptions:
 
 `utils.py`: Contains utility functions for handling API keys, generating filenames, and expanding queries.
