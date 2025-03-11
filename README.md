@@ -5,17 +5,21 @@
 > **ArxivLensAI: The Future of Research Interaction**  
 > ArxivLensAI is an innovative AI-powered research assistant designed to revolutionize the way researchers, students, and tech enthusiasts interact with academic content. By transforming static research papers into dynamic, interactive Q&A experiences, ArxivLensAI empowers users to delve deeper into complex topics with ease and precision.
 
----
 
 ## 🌟 Key Features
-
+- 📄 Upload and process multiple PDFs  
+- 🔍 Semantic search using FAISS  
+- 🤖 AI-powered question answering  
+- 📊 Extracts tables and figures from PDFs  
+- 🖼️ Supports image extraction from research papers
+  
 - **Interactive Q&A System:** Pose questions and receive immediate, context-aware answers.
 - **Intelligent PDF Processing:** Effortlessly extract and analyze content from research papers.
 - **High-Performance FAISS Storage:** Leverage advanced similarity search for rapid retrieval.
 - **Scalable Architecture:** Built to handle extensive research databases and evolving user needs.
 - **User-Centric Design:** Enjoy a sleek, intuitive interface crafted for a seamless research experience.
 
----
+
 
 ## 🚀 Getting Started
 
@@ -30,8 +34,9 @@ cd ArxivLensAI
 
 #### Using Virtualenv (pip)
 ```bash
-python -m venv env
-source env/bin/activate   # Windows: env\Scripts\activate
+python -m venv venv
+venv\Scripts\activate     # On Windows
+source venv/bin/activate  # On Mac/Linux
 ```
 
 #### Using Conda
@@ -69,7 +74,7 @@ Explore the powerful interface through our curated screenshots:
 ### 💡 Answer Display
 ![Answer](static/screenshots/answer.png)
 
----
+
 
 ## 📂 Project Architecture
 
@@ -93,7 +98,7 @@ ArxivLensAI/
 └── temp/                 # Temporary file storage
 ```
 
----
+
 
 ## 🔧 Configuration
 
@@ -128,7 +133,7 @@ ArxivLensAI/
 - Supports batch processing for better performance
 
 
----
+
 ## 🔮 Roadmap & Future Enhancements
 
 We're continuously evolving ArxivLensAI. Upcoming features include:
@@ -139,7 +144,7 @@ We're continuously evolving ArxivLensAI. Upcoming features include:
 - **Customizable AI Modules:** Tailor answer generation for domain-specific research.
 - **Community-Driven Innovations:** Incorporate user feedback and contributions to shape future releases.
 
----
+
 
 ## 🤝 Contributing
 
@@ -152,13 +157,13 @@ We welcome contributions from developers and researchers alike. Here’s how you
 
 For more details, please refer to our [Contribution Guidelines](CONTRIBUTING.md).
 
----
+
 
 ## 📜 License
 
 ArxivLensAI is released under the **MIT License**. See the [LICENSE](LICENSE) file for complete details.
 
----
+
 
 ## 💬 Join the Conversation
 
@@ -166,7 +171,7 @@ Stay updated and get involved:
 
 [![GitHub](https://img.shields.io/badge/Visit-GitHub-black?style=for-the-badge&logo=github)](https://github.com/pranavsinghpatil/ArxivLensAI) [![Twitter](https://img.shields.io/badge/Follow-Twitter-blue?style=for-the-badge&logo=twitter)](https://x.com/syntaxnomad)
 
----
+
 
 ## 📚 Additional Resources
 
@@ -174,7 +179,7 @@ Stay updated and get involved:
 - **User Guide:** Refer to the [User Guide](docs/USER_GUIDE.md) for a complete walkthrough.
 - **API Reference:** Check out the [API Reference](docs/API_REFERENCE.md) for integration details.
 
----
+
 
 ## 🛠️ Setup & Maintenance Tips
 
@@ -183,7 +188,7 @@ For a seamless setup experience, note the following:
 - **Environment Management:** Whether using virtualenv or Conda, ensure your environment is activated before installing dependencies.
 - **Dependency Updates:** Regularly update your dependencies to stay compatible with the latest features.
 - **Community Support:** Engage with our community for troubleshooting and feature discussions.
----
+
 ## Project Files Descriptions:
 
 `utils.py`: Contains utility functions for handling API keys, generating filenames, and expanding queries.
