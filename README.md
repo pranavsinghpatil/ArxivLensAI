@@ -195,14 +195,19 @@ For a seamless setup experience, note the following:
 ## Project Files Descriptions:
 
 `utils.py`: Contains utility functions for handling API keys, generating filenames, and expanding queries.
+
 `main.py`: Handles the primary execution flow, including PDF processing and FAISS index creation.
+
 `extract_text.py`: Manages the extraction of text, tables, and images from PDFs using PyMuPDF, pdfplumber, and Tesseract.
+
 `vector_store.py`: Implements FAISS index creation and management for efficient similarity search.
+
 `qa_system.py`: Integrates multiple AI models to provide comprehensive answers to user queries.
+
 `app.py`: The main application file that sets up the Streamlit interface and manages user interactions.
 
 ---
 
 *Made with ❤️ and passion for transforming the way research is experienced.*
 
-```
+
