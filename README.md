@@ -1,8 +1,11 @@
 # ArxivLensAI 🚀
 
-![ArxivLensAI](https://img.shields.io/badge/Status-Active-brightgreen) ![License](https://img.shields.io/badge/License-MIT-blue) ![Contributions](https://img.shields.io/badge/PRs-Welcome-orange) 
+![ArxivLensAI](https://img.shields.io/badge/Status-Active-brightgreen) ![License](https://img.shields.io/badge/License-MIT-blue) ![Contributions](https://img.shields.io/badge/PRs-Welcome-orange) [![Issues](https://img.shields.io/github/issues/pranavsinghpatil/ArxivLensAI)](https://github.com/pranavsinghpatil/ArxivLensAI/issues) [![Last Commit](https://img.shields.io/github/last-commit/pranavsinghpatil/ArxivLensAI)](https://github.com/pranavsinghpatil/ArxivLensAI/commits/main)  
 
-![Stars](https://img.shields.io/github/stars/pranavsinghpatil/ArxivLensAI)  ![Forks](https://img.shields.io/github/forks/pranavsinghpatil/ArxivLensAI) 
+
+[![Stars](https://img.shields.io/github/stars/pranavsinghpatil/ArxivLensAI?style=social)](https://github.com/pranavsinghpatil/ArxivLensAI/stargazers)  [![Forks](https://img.shields.io/github/forks/pranavsinghpatil/ArxivLensAI?style=social)](https://github.com/pranavsinghpatil/ArxivLensAI/network/members)  
+
+
 > **ArxivLensAI: The Future of Research Interaction**  
 > ArxivLensAI is an innovative AI-powered research assistant designed to revolutionize the way researchers, students, and tech enthusiasts interact with academic content. By transforming static research papers into dynamic, interactive Q&A experiences, ArxivLensAI empowers users to delve deeper into complex topics with ease and precision.
 
