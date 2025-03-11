@@ -3,7 +3,7 @@
 ![ArxivLensAI](https://img.shields.io/badge/Status-Active-brightgreen) ![License](https://img.shields.io/badge/License-MIT-blue) ![Contributions](https://img.shields.io/badge/PRs-Welcome-orange)
 
 > **ArxivLensAI: The Future of Research Interaction**  
-> Transform static research papers into a dynamic, interactive Q&A experience. Whether you're a researcher, student, or tech enthusiast, our AI-powered assistant empowers you to dive deeper into academic content with ease and precision.
+> ArxivLensAI is an innovative AI-powered research assistant designed to revolutionize the way researchers, students, and tech enthusiasts interact with academic content. By transforming static research papers into dynamic, interactive Q&A experiences, ArxivLensAI empowers users to delve deeper into complex topics with ease and precision.
 
 ---
 
