@@ -36,28 +36,39 @@ def extract_tables_from_pdf(pdf_path, page_number):
 
 def extract_text_from_pdf(pdf_path):
     """Extracts clean text and tables from a given PDF file."""
+    if not os.path.exists(pdf_path):
+        print(f"Error: PDF file not found at {pdf_path}")
+        return ""
+        
     try:
         doc = fitz.open(pdf_path)  # Open the PDF
+        if doc is None:
+            print(f"Error: Could not open PDF {pdf_path}")
+            return ""
+            
+        extracted_text = []
+
+        for page_num, page in enumerate(doc):
+            # Extract plain text
+            try:
+                page_text = page.get_text("text") or ""  # Use empty string if None
+                extracted_text.append(page_text)
+                
+                # Extract tables (using pdfplumber)
+                table_text = extract_tables_from_pdf(pdf_path, page_num) or ""
+                if table_text:
+                    extracted_text.append(table_text)
+            except Exception as e:
+                print(f"Warning: Error extracting text from page {page_num + 1}: {e}")
+                continue
+
+        doc.close()  # Properly close the document
+        final_text = "\n".join(text for text in extracted_text if text)
+        return clean_text(final_text) if final_text else ""
+        
     except Exception as e:
-        print(f"Error opening PDF {pdf_path}: {e}")
+        print(f"Error processing PDF {pdf_path}: {e}")
         return ""
-
-    extracted_text = ""
-
-    for page_num, page in enumerate(doc):
-        # Extract plain text
-        page_text = page.get_text("text")
-        if page_text is None:
-            print(f"Warning: No text extracted from page {page_num + 1}")
-            page_text = ""
-
-        # Extract tables (using pdfplumber)
-        table_text = extract_tables_from_pdf(pdf_path, page_num) or ""
-
-        # Concatenate extracted text
-        extracted_text += f"{page_text}\n{table_text}\n"
-
-    return clean_text(extracted_text)
 
 def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
     """
@@ -91,10 +102,15 @@ def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
 
 def clean_text(text):
     """Cleans extracted text by removing extra spaces and fixing line breaks."""
-    if text is None:
-        print("Warning: clean_text received None")
+    if not text or not isinstance(text, str):
+        print(f"Warning: Invalid text received in clean_text: {type(text)}")
         return ""
-    text = text.encode("utf-8", "ignore").decode("utf-8")
-    text = re.sub(r'\s+', ' ', text)  # Remove multiple spaces
-    text = re.sub(r'-\s', '', text)   # Fix hyphenated words
-    return text.strip()
+        
+    try:
+        text = text.encode("utf-8", "ignore").decode("utf-8")
+        text = re.sub(r'\s+', ' ', text)  # Remove multiple spaces
+        text = re.sub(r'-\s', '', text)   # Fix hyphenated words
+        return text.strip()
+    except Exception as e:
+        print(f"Error cleaning text: {e}")
+        return ""
