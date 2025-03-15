@@ -20,7 +20,22 @@ def setv_api_keys(gapi_key=None, hapi_key=None):
         huggingface_api_key = hapi_key
 
 # Load Model Once
-embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", token=huggingface_api_key) if huggingface_api_key else None
+def initialize_embedding_model():
+    """Initialize the sentence transformer model with proper error handling."""
+    global embedding_model
+    if not huggingface_api_key:
+        print("[ERROR] Hugging Face API key is not set. Please set it before processing PDFs.")
+        return None
+        
+    try:
+        model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", token=huggingface_api_key)
+        print("[SUCCESS] Successfully initialized embedding model")
+        return model
+    except Exception as e:
+        print(f"[ERROR] Failed to initialize embedding model: {e}")
+        return None
+
+embedding_model = initialize_embedding_model()
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
 faiss_indexes_dir = os.path.join(project_dir, "faiss_indexes")
@@ -28,35 +43,72 @@ os.makedirs(faiss_indexes_dir, exist_ok=True)
 
 def encode_chunks_parallel(text_chunks):
     """Encodes text chunks efficiently in batches."""
-    return embedding_model.encode(text_chunks, batch_size=16, show_progress_bar=True)
+    if embedding_model is None:
+        print("[ERROR] Embedding model is not initialized")
+        return None
+        
+    try:
+        print(f"[DEBUG] Encoding {len(text_chunks)} chunks in batches")
+        embeddings = embedding_model.encode(text_chunks, batch_size=16, show_progress_bar=True)
+        print(f"[DEBUG] Successfully encoded chunks to shape {embeddings.shape}")
+        return embeddings
+    except Exception as e:
+        print(f"[ERROR] Failed to encode chunks: {e}")
+        return None
 
 def build_faiss_index(text_chunks, pdf_path):
     """Creates and saves FAISS index efficiently with unique filenames."""
-    embeddings = encode_chunks_parallel(text_chunks)
+    global embedding_model
+    
+    if embedding_model is None:
+        print("[ERROR] Embedding model is not initialized. Please ensure Hugging Face API key is set.")
+        return None, None, None
+        
+    if not text_chunks:
+        print("[ERROR] No text chunks provided for indexing")
+        return None, None, None
+        
+    try:
+        print("[DEBUG] Encoding text chunks...")
+        embeddings = encode_chunks_parallel(text_chunks)
+        
+        if embeddings is None or len(embeddings) == 0:
+            print("[ERROR] Failed to generate embeddings")
+            return None, None, None
 
-    # Use HNSW only if supported (IVFFlat does NOT support it)
-    quantizer = faiss.IndexFlatL2(embeddings.shape[1])
-    index = faiss.IndexIVFFlat(quantizer, embeddings.shape[1], 100)  # 100 clusters
+        print(f"[DEBUG] Generated embeddings with shape: {embeddings.shape}")
+        
+        # Use HNSW only if supported (IVFFlat does NOT support it)
+        quantizer = faiss.IndexFlatL2(embeddings.shape[1])
+        index = faiss.IndexIVFFlat(quantizer, embeddings.shape[1], min(100, len(embeddings)))  # Adjust clusters based on data size
+        
+        print("[DEBUG] Training FAISS index...")
+        index.train(embeddings)
+        
+        print("[DEBUG] Adding vectors to index...")
+        index.add(embeddings)
 
-    index.train(embeddings)  # Train index with embeddings
-    index.add(embeddings)
+        # Generate unique FAISS filename
+        base_filename = get_faiss_index_filename(pdf_path)
+        faiss_index_filename = os.path.join(faiss_indexes_dir, base_filename)
+        chunks_filename = os.path.join(faiss_indexes_dir, f"chunks_{base_filename}.pkl")
 
-    # Generate unique FAISS filename
-    base_filename = get_faiss_index_filename(pdf_path)
-    faiss_index_filename = os.path.join(faiss_indexes_dir, base_filename)
+        print("[DEBUG] Saving files...")
+        # Save FAISS index
+        faiss.write_index(index, faiss_index_filename)
 
-    # Save FAISS index
-    faiss.write_index(index, faiss_index_filename)
+        # Save text chunks
+        with open(chunks_filename, "wb") as f:
+            pickle.dump(text_chunks, f)
 
-    # Save text chunks
-    chunks_filename = os.path.join(faiss_indexes_dir, f"chunks_{base_filename}.pkl")
-    with open(chunks_filename, "wb") as f:
-        pickle.dump(text_chunks, f)
+        print(f"[SUCCESS] FAISS index saved to {faiss_index_filename}")
+        print(f"[SUCCESS] Chunks saved to {chunks_filename}")
 
-    print(f"✅ FAISS index saved to {faiss_index_filename}.")
-    print(f"✅ Chunks saved to {chunks_filename}.")
-
-    return index, embeddings, text_chunks
+        return index, embeddings, text_chunks
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to build FAISS index: {e}")
+        return None, None, None
 
 faiss_index_cache = {}  # Cache to store loaded indexes
 

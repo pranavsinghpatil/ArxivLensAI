@@ -36,38 +36,58 @@ def extract_tables_from_pdf(pdf_path, page_number):
 
 def extract_text_from_pdf(pdf_path):
     """Extracts clean text and tables from a given PDF file."""
+    print(f"[DEBUG] Starting PDF extraction from: {pdf_path}")
+    
     if not os.path.exists(pdf_path):
-        print(f"Error: PDF file not found at {pdf_path}")
+        print(f"[ERROR] PDF file not found at {pdf_path}")
         return ""
         
     try:
+        print("[DEBUG] Opening PDF with PyMuPDF...")
         doc = fitz.open(pdf_path)  # Open the PDF
         if doc is None:
-            print(f"Error: Could not open PDF {pdf_path}")
+            print(f"[ERROR] Could not open PDF {pdf_path}")
             return ""
             
         extracted_text = []
+        print(f"[DEBUG] PDF has {len(doc)} pages")
 
         for page_num, page in enumerate(doc):
+            print(f"[DEBUG] Processing page {page_num + 1}")
             # Extract plain text
             try:
-                page_text = page.get_text("text") or ""  # Use empty string if None
-                extracted_text.append(page_text)
+                page_text = page.get_text("text")
+                print(f"[DEBUG] Page {page_num + 1} text type: {type(page_text)}, length: {len(page_text) if page_text else 0}")
                 
+                if page_text:
+                    extracted_text.append(page_text)
+                    
                 # Extract tables (using pdfplumber)
-                table_text = extract_tables_from_pdf(pdf_path, page_num) or ""
+                table_text = extract_tables_from_pdf(pdf_path, page_num)
                 if table_text:
+                    print(f"[DEBUG] Found table text on page {page_num + 1}")
                     extracted_text.append(table_text)
             except Exception as e:
-                print(f"Warning: Error extracting text from page {page_num + 1}: {e}")
+                print(f"[ERROR] Failed extracting text from page {page_num + 1}: {e}")
                 continue
 
-        doc.close()  # Properly close the document
-        final_text = "\n".join(text for text in extracted_text if text)
-        return clean_text(final_text) if final_text else ""
+        doc.close()
+        print("[DEBUG] PDF document closed")
+        
+        # Join all extracted text
+        final_text = "\n".join(text for text in extracted_text if text and isinstance(text, str))
+        print(f"[DEBUG] Final text length before cleaning: {len(final_text)}")
+        
+        if not final_text:
+            print("[WARNING] No text was extracted from the PDF")
+            return ""
+            
+        cleaned_text = clean_text(final_text)
+        print(f"[DEBUG] Text length after cleaning: {len(cleaned_text)}")
+        return cleaned_text
         
     except Exception as e:
-        print(f"Error processing PDF {pdf_path}: {e}")
+        print(f"[ERROR] Failed processing PDF {pdf_path}: {e}")
         return ""
 
 def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
@@ -102,15 +122,36 @@ def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
 
 def clean_text(text):
     """Cleans extracted text by removing extra spaces and fixing line breaks."""
-    if not text or not isinstance(text, str):
-        print(f"Warning: Invalid text received in clean_text: {type(text)}")
+    print(f"[DEBUG] clean_text received text of type: {type(text)}")
+    
+    if text is None:
+        print("[ERROR] clean_text received None")
+        return ""
+        
+    if not isinstance(text, str):
+        print(f"[ERROR] clean_text received non-string type: {type(text)}")
+        return ""
+    
+    if not text.strip():
+        print("[WARNING] clean_text received empty or whitespace-only string")
         return ""
         
     try:
+        print(f"[DEBUG] Original text length: {len(text)}")
+        # Remove any null bytes that might cause encoding issues
+        text = text.replace('\x00', '')
+        
+        # Handle encoding
         text = text.encode("utf-8", "ignore").decode("utf-8")
-        text = re.sub(r'\s+', ' ', text)  # Remove multiple spaces
-        text = re.sub(r'-\s', '', text)   # Fix hyphenated words
-        return text.strip()
+        
+        # Clean up whitespace
+        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r'-\s', '', text)
+        text = text.strip()
+        
+        print(f"[DEBUG] Cleaned text length: {len(text)}")
+        return text
     except Exception as e:
-        print(f"Error cleaning text: {e}")
+        print(f"[ERROR] Failed to clean text: {e}")
+        print(f"[DEBUG] Text that caused error: {repr(text)[:100]}...")
         return ""
