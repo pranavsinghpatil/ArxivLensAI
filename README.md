@@ -64,19 +64,45 @@ streamlit run app.py
 💡 **Experience the future of research. Upload your PDF and let ArxivLensAI guide your discoveries!**
 
 ---
+### System Workflow
+
+1. **PDF Upload & Processing**
+   ```mermaid
+   graph LR
+       A[Upload PDF] --> B[Extract Content]
+       B --> C[Clean Text]
+       C --> D[Build Index]
+       D --> E[Cache Index]
+   ```
+
+2. **Query Processing**
+   ```mermaid
+   graph LR
+       A[User Query] --> B[Search Index]
+       B --> C[Build Context]
+       C --> D[Generate Answer]
+       D --> E[Update Memory]
+   ```
+---
 
 ## 📸 Visual Showcase
 
 Explore the powerful interface through our curated screenshots:
 
 ### 📂 Upload Interface
-![Upload](static/screenshots/UI.png)
+<div align="center">
+  <img src="static/screenshots/UI.png" alt="Upload" width="600"/>
+</div>
 
 ### ❓ Interactive Query
-![Query](static/screenshots/querying.png)
+<div align="center">
+  <img src="static/screenshots/querying.png" alt="Query" width="600"/>
+</div>
 
 ### 💡 Answer Display
-![Answer](static/screenshots/response.png)
+<div align="center">
+  <img src="static/screenshots/response.png" alt="Answer" width="600"/>
+</div>
 
 
 ---
