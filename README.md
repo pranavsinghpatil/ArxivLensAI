@@ -70,13 +70,13 @@ streamlit run app.py
 Explore the powerful interface through our curated screenshots:
 
 ### 📂 Upload Interface
-![Upload](static/screenshots/upload.png)
+![Upload](static/screenshots/UI.png)
 
 ### ❓ Interactive Query
-![Query](static/screenshots/query.png)
+![Query](static/screenshots/querying.png)
 
 ### 💡 Answer Display
-![Answer](static/screenshots/answer.png)
+![Answer](static/screenshots/response.png)
 
 
 ---
@@ -180,9 +180,10 @@ Stay updated and get involved:
 
 ## 📚 Additional Resources
 
-- **Documentation:** Explore our detailed [Project Documentation](docs/DOCUMENTATION.md).
-- **User Guide:** Refer to the [User Guide](docs/USER_GUIDE.md) for a complete walkthrough.
-- **API Reference:** Check out the [API Reference](docs/API_REFERENCE.md) for integration details.
+- **Project Technical Report:** Explore our detailed [Project Documentation](docs/TechnicalReport.md).
+- **User Guide:** Refer to the [User Guide](docs/UserGuide.md) for a complete walkthrough.
+- **API Reference:** Check out the [API Reference](docs/APIReference.md) for integration details.
+- **Release Notes:** Stay updated with our [Release Notes](docs/ReleaseNotes.md).
 
 ---
 
