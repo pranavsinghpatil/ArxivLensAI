@@ -161,8 +161,8 @@ if not GOOGLE_API_KEY or not HUGGINGFACE_API_KEY:
     # Set API keys in qa_system
     set_api_keys(gapi_key, hapi_key)
 else:
-    st.sidebar.markdown("---")
-    st.sidebar.success('API key already provided!', icon='✅')
+    # st.sidebar.markdown("---")
+    # st.sidebar.success('API key already provided!', icon='✅')
     set_api_keys(gapi_key=GOOGLE_API_KEY, hapi_key=HUGGINGFACE_API_KEY)
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ArxivLensAI")
