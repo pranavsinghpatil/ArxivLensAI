@@ -179,7 +179,7 @@ sequenceDiagram
 
 #### 1. File Structure
 ```
-research_qa/
+ArxivLensAI/
 ├── app.py                 # Main Streamlit application
 ├── extract_text.py        # PDF processing
 ├── vector_store.py        # FAISS operations
@@ -271,11 +271,6 @@ requirements = {
 }
 ```
 
-## Future Improvements
-- **Summarization:** Automatic paper summarization
-- **Citation Management:** Extract and organize citations
-- **Collaborative Features:** Share research insights
-- **UI Enhancements:** Refined chat interface
 
 ## Conclusion
 ArxivLensAI demonstrates a robust architecture that effectively combines modern AI technologies with practical research tools. The system's modular design ensures maintainability and extensibility, while its optimized performance makes it suitable for both local and cloud deployment.
