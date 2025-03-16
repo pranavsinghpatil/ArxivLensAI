@@ -1,7 +1,7 @@
-# ArxivLensAI 🚀
+# ArxivLensAI 🚀 
 
-![ArxivLensAI](https://img.shields.io/badge/Status-Active-brightgreen) ![License](https://img.shields.io/badge/License-MIT-blue) ![Contributions](https://img.shields.io/badge/PRs-Welcome-orange) [![Issues](https://img.shields.io/github/issues/pranavsinghpatil/ArxivLensAI)](https://github.com/pranavsinghpatil/ArxivLensAI/issues) [![Last Commit](https://img.shields.io/github/last-commit/pranavsinghpatil/ArxivLensAI)](https://github.com/pranavsinghpatil/ArxivLensAI/commits/main)  
-
+![ArxivLensAI](https://img.shields.io/badge/Status-Active-brightgreen) ![License](https://img.shields.io/badge/License-MIT-blue) [![GitHub Release](https://img.shields.io/github/v/release/pranavsinghpatil/ArxivLensAI.svg)](https://github.com/pranavsinghpatil/ArxivLensAI/releases)
+ ![Contributions](https://img.shields.io/badge/PRs-Welcome-orange) [![Issues](https://img.shields.io/github/issues/pranavsinghpatil/ArxivLensAI)](https://github.com/pranavsinghpatil/ArxivLensAI/issues) [![Last Commit](https://img.shields.io/github/last-commit/pranavsinghpatil/ArxivLensAI)](https://github.com/pranavsinghpatil/ArxivLensAI/commits/main)  
 
 [![Stars](https://img.shields.io/github/stars/pranavsinghpatil/ArxivLensAI?style=social)](https://github.com/pranavsinghpatil/ArxivLensAI/stargazers)  [![Forks](https://img.shields.io/github/forks/pranavsinghpatil/ArxivLensAI?style=social)](https://github.com/pranavsinghpatil/ArxivLensAI/network/members)  
 
