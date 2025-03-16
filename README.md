@@ -67,22 +67,11 @@ streamlit run app.py
 ### System Workflow
 
 1. **PDF Upload & Processing**
-   ```mermaid
-   graph LR
-       A[Upload PDF] --> B[Extract Content]
-       B --> C[Clean Text]
-       C --> D[Build Index]
-       D --> E[Cache Index]
-   ```
+![PDF Upload & Processing](static/screenshots/sw1.png)
 
 2. **Query Processing**
-   ```mermaid
-   graph LR
-       A[User Query] --> B[Search Index]
-       B --> C[Build Context]
-       C --> D[Generate Answer]
-       D --> E[Update Memory]
-   ```
+![Query Processing](static/screenshots/sw2.png)
+
 ---
 
 ## 📸 Visual Showcase
