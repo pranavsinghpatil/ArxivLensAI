@@ -53,6 +53,7 @@ uploaded_files = st.sidebar.file_uploader("Upload PDFs", type="pdf", accept_mult
 available_papers = {}
 if uploaded_files:
     for uploaded_file in uploaded_files:
+        print(f"[DEBUG] Processing uploaded file: {uploaded_file.name}")
         pdf_path = os.path.join(temp_dir, uploaded_file.name)
         with open(pdf_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
@@ -64,19 +65,42 @@ if uploaded_files:
         try:
             faiss_index_filename = get_faiss_index_filename(pdf_path)
             faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
+            chunks_filename = os.path.join(faiss_indexes_dir, f"chunks_{faiss_index_filename}.pkl")
 
-            if not os.path.exists(faiss_index_path):
+            print(f"[DEBUG] Checking for existing index at: {faiss_index_path}")
+            if not os.path.exists(faiss_index_path) or not os.path.exists(chunks_filename):
+                print("[DEBUG] Index not found, processing PDF...")
                 process_pdf(pdf_path)
+            else:
+                print("[DEBUG] Found existing index")
 
             available_papers[uploaded_file.name] = pdf_path
         except Exception as e:
+            print(f"[ERROR] Failed to process {uploaded_file.name}: {e}")
             st.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
 
 # ✅ Load Default Paper if No Uploads
 if not available_papers:
-    st.sidebar.info("📌 Attention Is All You Need pdf")
+    st.sidebar.info("📌 Using default paper: Attention Is All You Need")
     if os.path.exists(default_paper_path):
+        print(f"[DEBUG] Loading default paper from: {default_paper_path}")
         available_papers["Attention Is All You Need (Default)"] = default_paper_path
+        
+        # Process default paper if needed
+        try:
+            faiss_index_filename = get_faiss_index_filename(default_paper_path)
+            faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
+            chunks_filename = os.path.join(faiss_indexes_dir, f"chunks_{faiss_index_filename}.pkl")
+            
+            print(f"[DEBUG] Checking for default paper index at: {faiss_index_path}")
+            if not os.path.exists(faiss_index_path) or not os.path.exists(chunks_filename):
+                print("[DEBUG] Processing default paper...")
+                process_pdf(default_paper_path)
+            else:
+                print("[DEBUG] Found existing index for default paper")
+        except Exception as e:
+            print(f"[ERROR] Failed to process default paper: {e}")
+            st.error("⚠️ Error processing default paper!")
     else:
         st.error("⚠️ Default research paper is missing! Please upload a file.")
 
@@ -87,7 +111,9 @@ selected_papers = st.sidebar.multiselect(
     default=list(available_papers.keys())
 )
 st.session_state.selected_papers = [available_papers[p] for p in selected_papers]
-#------------------------------------------------------------
+
+# ------------------------------------------------------------
+
 if not GOOGLE_API_KEY or not HUGGINGFACE_API_KEY:
     st.sidebar.markdown("---")
     st.sidebar.info("Enter both API keys to proceed.", icon='⬇️')
@@ -187,64 +213,73 @@ def is_full_context_query(query, keywords, threshold=80):
     best_match = max(matches, key=lambda x: x[1])
     return best_match[1] >= threshold
 
-# ✅ Search and Generate Answer
+# Handle user query
 if query:
-    # Display user message in chat message container
+    print(f"\n[DEBUG] Processing new query: {query}")
+    
+    # Display user message
     st.chat_message("user", avatar=os.path.join(static_dir, "icons", "user-icon.png")).markdown(query)
-    # Add user message to chat history
-    st.session_state.chat_history.append({"role": "user", "content": query})
     st.session_state.conversation_history.append({"role": "user", "content": query})
 
     # Display assistant message with spinner while processing
     with st.chat_message("assistant", avatar=os.path.join(static_dir, "icons", "bot-icon.png")):
         with st.spinner("Thinking..."):
-            # Detect full context queries
-            full_context = is_full_context_query(query, full_context_keywords)
+            try:
+                # Load FAISS indexes for selected papers
+                print(f"[DEBUG] Selected papers: {st.session_state.selected_papers}")
+                all_chunks = []
+                all_indexes = []
+                
+                for pdf_path in st.session_state.selected_papers:
+                    try:
+                        print(f"[DEBUG] Loading index for: {pdf_path}")
+                        index, chunks = load_faiss_index(pdf_path)
+                        if index is not None and chunks is not None:
+                            all_indexes.append(index)
+                            all_chunks.extend(chunks)
+                            print(f"[DEBUG] Loaded {len(chunks)} chunks from {pdf_path}")
+                        else:
+                            print(f"[WARNING] Failed to load index for {pdf_path}")
+                    except Exception as e:
+                        print(f"[ERROR] Error loading index for {pdf_path}: {e}")
+                        continue
 
-            all_retrieved_chunks = []
-            previous_queries = [entry["content"] for entry in st.session_state.memory if entry["role"] == "user"]
+                if not all_chunks or not all_indexes:
+                    st.error("❌ No valid indexes found for the selected papers!")
+                    st.stop()
 
-            # Merge past queries to enhance context
-            query_context = " ".join(previous_queries[-3:])  # Last 3 queries for context
-            query_with_memory = f"{query_context} {query}" if query_context else query
+                print(f"[DEBUG] Total chunks loaded: {len(all_chunks)}")
+                
+                # Search for relevant chunks
+                relevant_chunks = []
+                for index, chunks in zip(all_indexes, [all_chunks]):
+                    try:
+                        chunks_found = search_faiss(query, index, embedding_model, chunks, 
+                                                  st.session_state.conversation_history)
+                        if chunks_found and chunks_found[0] != "Error:":
+                            relevant_chunks.extend(chunks_found)
+                            print(f"[DEBUG] Found {len(chunks_found)} relevant chunks")
+                    except Exception as e:
+                        print(f"[ERROR] FAISS search failed: {e}")
+                        continue
 
-            for pdf_path in st.session_state.selected_papers:
-                try:
-                    faiss_index, chunks = load_faiss_index(pdf_path)
-                    if full_context:
-                        # If full context is needed, use all chunks
-                        all_retrieved_chunks.extend(chunks)
-                    else:
-                        retrieved_chunks = search_faiss(query, faiss_index, embedding_model, chunks, st.session_state.memory)
-                        all_retrieved_chunks.extend(retrieved_chunks)
-                except Exception as e:
-                    st.error(f"❌ Error retrieving from {pdf_path}: {str(e)}")
+                if not relevant_chunks:
+                    st.error("❌ Could not find relevant information in the papers!")
+                    st.stop()
 
-            # Load text from images
-            image_texts_file = os.path.join(faiss_indexes_dir, f"image_texts_{faiss_index_filename}.txt")
-            if os.path.exists(image_texts_file):
-                with open(image_texts_file, "r") as f:
-                    image_texts = f.read().splitlines()
-            else:
-                image_texts = []
+                # Generate answer
+                answer = generate_answer_huggingface(
+                    query=query,
+                    retrieved_chunks=relevant_chunks,
+                    memory=st.session_state.conversation_history,
+                    image_texts=[],  # TODO: Add image text support
+                    table_texts=[],   # TODO: Add table text support
+                    full_context=False
+                )
 
-            # Load text from tables
-            tables_file = os.path.join(faiss_indexes_dir, f"tables_{faiss_index_filename}.md")
-            if os.path.exists(tables_file):
-                with open(tables_file, "r") as f:
-                    table_texts = f.read().split("\n## Page")  # Split by page headers to separate tables
-            else:
-                table_texts = []
-
-            # Generate the final answer with the combined context
-            answer = generate_answer_huggingface(query, all_retrieved_chunks, st.session_state.memory, image_texts, table_texts, full_context=full_context)
-
-            # Display the response
-            st.write(answer)
-
-    # Add assistant response to chat history
-    st.session_state.chat_history.append({"role": "assistant", "content": answer})
-    st.session_state.conversation_history.append({"role": "assistant", "content": answer})
-
-    # Refresh UI
-    st.rerun()
+                st.markdown(answer)
+                st.session_state.conversation_history.append({"role": "assistant", "content": answer})
+                
+            except Exception as e:
+                print(f"[ERROR] Failed to process query: {e}")
+                st.error(f"❌ Error: {str(e)}")

@@ -5,8 +5,8 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "")
 
 # Optionally, you can set default values directly here if needed
-# GOOGLE_API_KEY = "YOUR_GOOGLE_API"
-# HUGGINGFACE_API_KEY = "YOUR_HUGGINGFACE_API"
+GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
+HUGGINGFACE_API_KEY = os.environ["HUGGINGFACE_API_KEY"]
 
 def get_chunks_filename(pdf_path):
     """Generates a unique filename for text chunks based on the PDF path."""

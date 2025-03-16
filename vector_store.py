@@ -6,6 +6,8 @@ import hashlib
 import os
 from utils import get_faiss_index_filename, expand_query, GOOGLE_API_KEY, HUGGINGFACE_API_KEY
 import streamlit as st
+import torch
+import torch.nn.functional as F
 
 # Initialize API keys from config or use placeholders
 google_api_key = GOOGLE_API_KEY
@@ -56,59 +58,100 @@ def encode_chunks_parallel(text_chunks):
         print(f"[ERROR] Failed to encode chunks: {e}")
         return None
 
-def build_faiss_index(text_chunks, pdf_path):
-    """Creates and saves FAISS index efficiently with unique filenames."""
-    global embedding_model
-    
-    if embedding_model is None:
-        print("[ERROR] Embedding model is not initialized. Please ensure Hugging Face API key is set.")
-        return None, None, None
-        
-    if not text_chunks:
-        print("[ERROR] No text chunks provided for indexing")
-        return None, None, None
-        
+def encode_query(query, model):
+    """Encode a query string into an embedding vector."""
     try:
+        # Normalize and clean query
+        query = query.strip().lower()
+        if not query:
+            return None
+            
+        # Get embedding using sentence transformer directly
+        embedding = model.encode([query], convert_to_numpy=True, normalize_embeddings=True)
+        if embedding is None or embedding.size == 0:
+            print("[ERROR] Failed to generate query embedding")
+            return None
+            
+        return embedding
+        
+    except Exception as e:
+        print(f"[ERROR] Query encoding failed: {e}")
+        return None
+
+def build_faiss_index(text_chunks, pdf_path):
+    """Build a FAISS index from text chunks."""
+    print("[DEBUG] Building FAISS index...")
+    print(f"[DEBUG] Number of chunks: {len(text_chunks)}")
+    
+    try:
+        # Encode chunks
         print("[DEBUG] Encoding text chunks...")
         embeddings = encode_chunks_parallel(text_chunks)
-        
         if embeddings is None or len(embeddings) == 0:
             print("[ERROR] Failed to generate embeddings")
             return None, None, None
-
+            
         print(f"[DEBUG] Generated embeddings with shape: {embeddings.shape}")
         
-        # Use HNSW only if supported (IVFFlat does NOT support it)
-        quantizer = faiss.IndexFlatL2(embeddings.shape[1])
-        index = faiss.IndexIVFFlat(quantizer, embeddings.shape[1], min(100, len(embeddings)))  # Adjust clusters based on data size
+        # Create and train index
+        dimension = embeddings.shape[1]
+        index = faiss.IndexFlatL2(dimension)
         
         print("[DEBUG] Training FAISS index...")
-        index.train(embeddings)
+        if len(text_chunks) > 1:
+            index.train(embeddings)
         
         print("[DEBUG] Adding vectors to index...")
         index.add(embeddings)
-
-        # Generate unique FAISS filename
-        base_filename = get_faiss_index_filename(pdf_path)
-        faiss_index_filename = os.path.join(faiss_indexes_dir, base_filename)
-        chunks_filename = os.path.join(faiss_indexes_dir, f"chunks_{base_filename}.pkl")
-
+        
         print("[DEBUG] Saving files...")
-        # Save FAISS index
-        faiss.write_index(index, faiss_index_filename)
-
-        # Save text chunks
-        with open(chunks_filename, "wb") as f:
-            pickle.dump(text_chunks, f)
-
-        print(f"[SUCCESS] FAISS index saved to {faiss_index_filename}")
-        print(f"[SUCCESS] Chunks saved to {chunks_filename}")
-
+        print(f"[SUCCESS] FAISS index saved to {os.path.join(faiss_indexes_dir, get_faiss_index_filename(pdf_path))}")
+        print(f"[SUCCESS] Chunks saved to {os.path.join(faiss_indexes_dir, f'chunks_{get_faiss_index_filename(pdf_path)}.pkl')}")
+        
         return index, embeddings, text_chunks
         
     except Exception as e:
         print(f"[ERROR] Failed to build FAISS index: {e}")
         return None, None, None
+
+def search_faiss(query, index, embedding_model, chunks, memory=None, k=5):
+    """Search for relevant chunks using FAISS."""
+    print(f"[DEBUG] Searching for query: {query}")
+    print(f"[DEBUG] Total available chunks: {len(chunks)}")
+    
+    try:
+        # Encode query
+        query_embedding = encode_query(query, embedding_model)
+        if query_embedding is None:
+            print("[ERROR] Failed to encode query")
+            return None
+            
+        # Search index
+        D, I = index.search(query_embedding.reshape(1, -1), k)
+        print(f"[DEBUG] Search results - distances: {D[0]}, indices: {I[0]}")
+        
+        # Get relevant chunks
+        relevant_chunks = []
+        for i, idx in enumerate(I[0]):
+            if idx < len(chunks):  # Validate index
+                chunk = chunks[idx]
+                distance = D[0][i]
+                print(f"[DEBUG] Chunk {i+1} (distance={distance:.4f}):")
+                print(f"[DEBUG] {chunk[:200]}...")
+                relevant_chunks.append(chunk)
+            else:
+                print(f"[WARNING] Invalid chunk index: {idx}")
+                
+        if not relevant_chunks:
+            print("[WARNING] No relevant chunks found")
+            return None
+            
+        print(f"[DEBUG] Found {len(relevant_chunks)} relevant chunks")
+        return relevant_chunks
+        
+    except Exception as e:
+        print(f"[ERROR] FAISS search failed: {e}")
+        return None
 
 faiss_index_cache = {}  # Cache to store loaded indexes
 
@@ -119,53 +162,12 @@ def load_faiss_index(pdf_path):
     chunks_filename = os.path.join(faiss_indexes_dir, f"chunks_{base_filename}.pkl")
 
     if not os.path.exists(faiss_index_filename):
-        raise FileNotFoundError(f"⚠️ FAISS index file not found: {faiss_index_filename}")
+        raise FileNotFoundError(f" FAISS index file not found: {faiss_index_filename}")
     if not os.path.exists(chunks_filename):
-        raise FileNotFoundError(f"⚠️ Chunks file not found: {chunks_filename}")
+        raise FileNotFoundError(f" Chunks file not found: {chunks_filename}")
 
     index = faiss.read_index(faiss_index_filename)
     with open(chunks_filename, "rb") as f:
         chunks = pickle.load(f)
 
     return index, chunks
-
-def search_faiss(query, faiss_index, embedding_model, chunks, memory, k=5):
-    """
-    Searches FAISS index for the most relevant chunks based on the query.
-    Includes query expansion and threshold-based filtering.
-
-    Args:
-        query (str): User's search query.
-        faiss_index (faiss.Index): The FAISS index for fast retrieval.
-        embedding_model (SentenceTransformer): The sentence embedding model.
-        chunks (list): List of text chunks.
-        memory (list): Chat history for query expansion.
-        k (int, optional): Number of top results to retrieve. Defaults to 5.
-
-    Returns:
-        list: The most relevant retrieved text chunks.
-    """
-    if faiss_index is None:
-        raise ValueError("❌ FAISS index is not loaded. Please process the PDF first.")
-
-    if not isinstance(query, str) or not query.strip():
-        raise ValueError("❌ Query must be a non-empty string.")
-
-    # Expand query using past user interactions
-    expanded_query = expand_query(query, memory)
-
-    # Encode the expanded query
-    query_embedding = embedding_model.encode([expanded_query], convert_to_numpy=True).astype("float32")
-
-    # Perform the FAISS search
-    D, I = faiss_index.search(query_embedding, k)
-
-    # Apply dynamic thresholding to filter low-confidence results
-    if D.size == 0 or I.size == 0:
-        return ["I couldn't find relevant information."]
-
-    # Compute the threshold dynamically (percentile-based filtering)
-    threshold = np.percentile(D[0], 75)  # Consider the top 25% of results
-    filtered_chunks = [chunks[i] for i, d in zip(I[0], D[0]) if i < len(chunks) and d < threshold]
-
-    return filtered_chunks if filtered_chunks else ["I couldn't find relevant information."]
