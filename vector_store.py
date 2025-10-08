@@ -21,23 +21,27 @@ def setv_api_keys(gapi_key=None, hapi_key=None):
     if hapi_key:
         huggingface_api_key = hapi_key
 
-# Load Model Once
+_embedding_model = None
 def initialize_embedding_model():
     """Initialize the sentence transformer model with proper error handling."""
-    global embedding_model
-    if not huggingface_api_key:
-        print("[ERROR] Hugging Face API key is not set. Please set it before processing PDFs.")
-        return None
-        
+    global _embedding_model
+    if _embedding_model is not None:
+        return _embedding_model
     try:
-        model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", token=huggingface_api_key)
+        # Allow anonymous loading if token is not provided (for local runs)
+        if huggingface_api_key:
+            _embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", token=huggingface_api_key)
+        else:
+            _embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         print("[SUCCESS] Successfully initialized embedding model")
-        return model
+        return _embedding_model
     except Exception as e:
         print(f"[ERROR] Failed to initialize embedding model: {e}")
         return None
 
-embedding_model = initialize_embedding_model()
+def get_embedding_model():
+    """Return initialized embedding model if available."""
+    return _embedding_model
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
 faiss_indexes_dir = os.path.join(project_dir, "faiss_indexes")
@@ -45,13 +49,13 @@ os.makedirs(faiss_indexes_dir, exist_ok=True)
 
 def encode_chunks_parallel(text_chunks):
     """Encodes text chunks efficiently in batches."""
-    if embedding_model is None:
+    if _embedding_model is None:
         print("[ERROR] Embedding model is not initialized")
         return None
         
     try:
         print(f"[DEBUG] Encoding {len(text_chunks)} chunks in batches")
-        embeddings = embedding_model.encode(text_chunks, batch_size=16, show_progress_bar=True)
+        embeddings = _embedding_model.encode(text_chunks, batch_size=16, show_progress_bar=True)
         print(f"[DEBUG] Successfully encoded chunks to shape {embeddings.shape}")
         return embeddings
     except Exception as e:

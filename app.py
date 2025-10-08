@@ -1,9 +1,13 @@
 # app.py
-from sentence_transformers import SentenceTransformer
 import streamlit as st
+
+# ✅ Streamlit UI setup - MUST be first Streamlit command
+st.set_page_config(page_title="📝 ArxivLensAI", layout="wide")
+
+from sentence_transformers import SentenceTransformer
 import pickle
-from qa_system import generate_answer_huggingface, set_api_keys
-from vector_store import search_faiss, load_faiss_index
+from qa_system import generate_answer_huggingface, set_api_keys, set_gemini_model_name
+from vector_store import search_faiss, load_faiss_index, initialize_embedding_model, get_embedding_model
 import os
 import faiss
 from main import process_pdf
@@ -16,8 +20,13 @@ import time
 # ✅ Fix GRPC error
 os.environ["GRPC_DNS_RESOLVER"] = "ares"
 
-# ✅ Load embedding model
-embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", token=HUGGINGFACE_API_KEY) if HUGGINGFACE_API_KEY else None
+# ✅ Defer embedding model initialization until keys are present
+embedding_model = None
+if HUGGINGFACE_API_KEY:
+	try:
+		embedding_model = initialize_embedding_model()
+	except Exception as e:
+		print(f"[WARNING] Could not initialize embedding model at startup: {e}")
 
 # ✅ Set up directories
 project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,14 +45,12 @@ os.makedirs(static_dir, exist_ok=True)
 # ✅ Default Research Paper
 default_paper_path = os.path.join(temp_dir, "Attention Is All You Need(default_research_paper).pdf")
 
-# ✅ Streamlit UI setup
-st.set_page_config(page_title="📝 ArxivLensAI", layout="wide")
-
 if "memory" not in st.session_state:
     st.session_state.memory = []
 
 # ✅ Display Fixed Header
 st.markdown("<h3 style='text-align: center;'>🤖 ArxivLensAI (An AI-Powered Research Assistant)</h3>", unsafe_allow_html=True)
+
 
 # 📌 Sidebar - Multiple PDF Upload
 st.sidebar.header("📄 Upload Research Papers")
@@ -101,6 +108,9 @@ if not available_papers:
         except Exception as e:
             print(f"[ERROR] Failed to process default paper: {e}")
             st.error("⚠️ Error processing default paper!")
+            # Non-blocking notice for missing tesseract OCR
+            if "tesseract is not installed" in str(e).lower():
+                st.toast("Image OCR unavailable (install Tesseract for image text).", icon="ℹ️")
     else:
         st.error("⚠️ Default research paper is missing! Please upload a file.")
 
@@ -114,9 +124,11 @@ st.session_state.selected_papers = [available_papers[p] for p in selected_papers
 
 # ------------------------------------------------------------
 
-if not GOOGLE_API_KEY or not HUGGINGFACE_API_KEY:
+if not GOOGLE_API_KEY:
     st.sidebar.markdown("---")
-    st.sidebar.info("Enter both API keys to proceed.", icon='⬇️')
+    st.sidebar.info("Enter your Google Gemini API key to proceed.", icon='⬇️')
+    # Also surface a toast to nudge user when key is missing
+    st.toast("Enter Google Gemini API key to proceed.", icon="🔑")
 
     # Google AI API key input
     gapi_key = st.sidebar.text_input(
@@ -127,43 +139,103 @@ if not GOOGLE_API_KEY or not HUGGINGFACE_API_KEY:
         key="gapi_key_input"
     )
 
-    # Hugging Face API key input
-    hapi_key = st.sidebar.text_input(
-        "🔑 Hugging Face API key",
-        type="password",
-        value=st.session_state.get("hapi_key", ""),
-        help="Enter your Hugging Face API key. It will be securely stored.",
-        key="hapi_key_input"
-    )
-
     # Store the API keys in session state
     if gapi_key:
         st.session_state["gapi_key"] = gapi_key
 
-    if hapi_key:
-        st.session_state["hapi_key"] = hapi_key
-
-    # Optional: Validate the API keys
-    if gapi_key and hapi_key and gapi_key.startswith("AIza") and hapi_key.startswith("hf_"):
-        st.sidebar.success("Both API keys have been entered successfully!", icon='✅')
-        embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token=hapi_key)
+    # Validate the Google key only
+    if gapi_key and gapi_key.startswith("AIza"):
+        st.sidebar.success("Google API key entered successfully!", icon='✅')
+        st.toast("Google API key saved to session.", icon="✅")
+        try:
+            # Update keys in downstream modules
+            set_api_keys(gapi_key=gapi_key, hapi_key=None)
+            # Ensure embedding model is initialized (anonymous if no HF key)
+            if embedding_model is None:
+                embedding_model = initialize_embedding_model()
+            # Reprocess default paper FAISS index with new embedding model
+            if os.path.exists(default_paper_path) and embedding_model is not None:
+                try:
+                    st.toast("Reprocessing default paper index...", icon="🛠️")
+                    process_pdf(default_paper_path, force_reprocess=True)
+                    st.toast("Default paper index ready.", icon="✅")
+                except Exception as re_err:
+                    st.sidebar.error(f"Failed to reprocess default paper: {re_err}")
+        except Exception as e:
+            st.sidebar.error(f"Failed to initialize embedding model: {e}")
 
     elif gapi_key and not gapi_key.startswith("AIza"):
         st.sidebar.warning("Please enter a valid Google AI API key!", icon="⚠️")
-    elif gapi_key and gapi_key.startswith("AIza"):
-        st.sidebar.info("Google AI API key entered. Waiting for Hugging Face API key.")
 
-    elif hapi_key and not hapi_key.startswith("hf_"):
-        st.sidebar.warning("Please enter a valid Hugging Face API key!", icon="⚠️")
-    elif hapi_key and hapi_key.startswith("hf_"):
-        st.sidebar.info("Hugging Face API key entered. Waiting for Google AI API key.")
-
-    # Set API keys in qa_system
-    set_api_keys(gapi_key, hapi_key)
+    # Set API keys in qa_system (only Google here)
+    set_api_keys(gapi_key, None)
 else:
     # st.sidebar.markdown("---")
     # st.sidebar.success('API key already provided!', icon='✅')
     set_api_keys(gapi_key=GOOGLE_API_KEY, hapi_key=HUGGINGFACE_API_KEY)
+    if embedding_model is None and HUGGINGFACE_API_KEY:
+        try:
+            embedding_model = initialize_embedding_model()
+        except Exception as e:
+            print(f"[WARNING] Late init of embedding model failed: {e}")
+    # If keys are present from secrets and model is ready, ensure default paper is processed
+    if HUGGINGFACE_API_KEY and os.path.exists(default_paper_path):
+        try:
+            # Only reprocess if index missing; do not force to avoid expensive work each run
+            faiss_index_filename = get_faiss_index_filename(default_paper_path)
+            faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
+            chunks_filename = os.path.join(faiss_indexes_dir, f"chunks_{faiss_index_filename}.pkl")
+            if not os.path.exists(faiss_index_path) or not os.path.exists(chunks_filename):
+                st.toast("Preparing default paper index...", icon="🛠️")
+                process_pdf(default_paper_path)
+                st.toast("Default paper index ready.", icon="✅")
+        except Exception as re_err:
+            st.sidebar.error(f"Failed to prepare default paper: {re_err}")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔑 Google Gemini API")
+current_gapi_default = st.session_state.get("gapi_key", GOOGLE_API_KEY)
+gapi_key = st.sidebar.text_input(
+    "Google AI API key",
+    type="password",
+    value=current_gapi_default,
+    help="Enter your Google AI API key. Stored in session only.",
+    key="gapi_key_input",
+)
+
+if gapi_key and gapi_key != st.session_state.get("gapi_key"):
+    st.session_state["gapi_key"] = gapi_key
+    st.toast("Google API key saved to session.", icon="✅")
+
+if gapi_key and gapi_key.startswith("AIza"):
+    try:
+        set_api_keys(gapi_key=gapi_key, hapi_key=None)
+        if embedding_model is None:
+            embedding_model = initialize_embedding_model()
+        if os.path.exists(default_paper_path) and embedding_model is not None:
+            # Prepare default index if missing
+            faiss_index_filename = get_faiss_index_filename(default_paper_path)
+            faiss_index_path = os.path.join(faiss_indexes_dir, faiss_index_filename)
+            chunks_filename = os.path.join(faiss_indexes_dir, f"chunks_{faiss_index_filename}.pkl")
+            if not os.path.exists(faiss_index_path) or not os.path.exists(chunks_filename):
+                st.toast("Preparing default paper index...", icon="🛠️")
+                process_pdf(default_paper_path)
+                st.toast("Default paper index ready.", icon="✅")
+    except Exception as e:
+        st.sidebar.error(f"Initialization error: {e}")
+elif gapi_key and not gapi_key.startswith("AIza"):
+    st.sidebar.warning("Please enter a valid Google AI API key!", icon="⚠️")
+
+# --- Gemini model selection ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("🤖 Gemini Model")
+# To avoid 404s on v1beta generateContent, use gemini-pro
+available_gemini_models = ["gemini-pro"]
+default_model = st.session_state.get("gemini_model_name", "gemini-pro")
+selected_model = st.sidebar.selectbox("Choose model", available_gemini_models, index=0)
+if selected_model != st.session_state.get("gemini_model_name"):
+	st.session_state["gemini_model_name"] = selected_model
+	set_gemini_model_name(selected_model)
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ArxivLensAI")
 st.sidebar.markdown("Version: `1.0.0`")

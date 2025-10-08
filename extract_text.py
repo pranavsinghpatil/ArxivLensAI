@@ -4,18 +4,37 @@ import re
 import os
 import pytesseract
 from PIL import Image
+import shutil
+
+def _is_tesseract_available():
+    """Return True if Tesseract OCR binary is available on PATH."""
+    try:
+        # pytesseract will raise if not available; shutil.which is fast precheck
+        if shutil.which("tesseract") is None:
+            return False
+        # Double-check via pytesseract (avoids false positives)
+        _ = pytesseract.get_tesseract_version()
+        return True
+    except Exception:
+        return False
 
 def extract_text_from_images(image_paths):
-    """Extracts text from images using OCR."""
+    """Extracts text from images using OCR. If Tesseract is unavailable, returns []."""
+    if not image_paths:
+        return []
+    if not _is_tesseract_available():
+        print("[INFO] Tesseract not found on PATH. Skipping image OCR.")
+        return []
     extracted_texts = []
     for image_path in image_paths:
         try:
             image = Image.open(image_path)
             text = pytesseract.image_to_string(image)
-            if text:  # Ensure text is not None or empty
+            if text:
                 extracted_texts.append(text)
         except Exception as e:
-            print(f"Error extracting text from {image_path}: {e}")
+            # Log a single-line notice per image without long traceback noise
+            print(f"[WARNING] OCR failed for {image_path}: {e}")
     return extracted_texts
 
 def extract_tables_from_pdf(pdf_path, page_number):

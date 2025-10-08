@@ -1,7 +1,6 @@
 from transformers import pipeline
 import os
 from vector_store import search_faiss
-from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import google.generativeai as genai
 import torch
@@ -9,50 +8,65 @@ import streamlit as st
 from utils import GOOGLE_API_KEY, HUGGINGFACE_API_KEY
 
 torch.classes.__path__ = []
-# Initialize API keys from config or use placeholders
+
+# Initialize API keys lazily
 google_api_key = GOOGLE_API_KEY
 huggingface_api_key = HUGGINGFACE_API_KEY
 
 def set_api_keys(gapi_key=None, hapi_key=None):
-    """Set API keys if provided."""
-    global google_api_key, huggingface_api_key
-    if gapi_key:
-        google_api_key = gapi_key
-    if hapi_key:
-        huggingface_api_key = hapi_key
+	"""Set API keys if provided."""
+	global google_api_key, huggingface_api_key
+	if gapi_key:
+		google_api_key = gapi_key
+	if hapi_key:
+		huggingface_api_key = hapi_key
 
-# 🔹 Step 1: Securely Configure Gemini API Key
-if google_api_key:
-    genai.configure(api_key=google_api_key)
+_gemini_model = None
+_gemini_model_name = "gemini-pro"
 
-# 🔹 Step 2: Initialize Gemini Model
-gemini_model = genai.GenerativeModel("gemini-2.0-flash") if google_api_key else None
+def _normalize_gemini_model_name(model_name: str) -> str:
+	"""Map various UI-friendly names to a server-supported model for v1beta generateContent."""
+	if not isinstance(model_name, str) or not model_name.strip():
+		return "gemini-pro"
+	name = model_name.strip()
+	# For v1beta generateContent, gemini-pro is the most broadly supported text model
+	return "gemini-pro"
 
-# ✅ Load Hugging Face Models
-model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-large")
-tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-large")
+def set_gemini_model_name(model_name: str):
+	"""Set the Gemini model name and reset cached model so it reloads next call."""
+	global _gemini_model_name, _gemini_model
+	_gemini_model_name = _normalize_gemini_model_name(model_name)
+	_gemini_model = None
 
-# ✅ Use GPU if available
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Device set to use {device}")
-model.to(device)
+def get_gemini_model():
+	global _gemini_model
+	if _gemini_model is not None:
+		return _gemini_model
+	if not google_api_key:
+		return None
+	try:
+		genai.configure(api_key=google_api_key)
+		_gemini_model = genai.GenerativeModel(_gemini_model_name)
+		return _gemini_model
+	except Exception as e:
+		print(f"[ERROR] Failed to initialize Gemini model: {e}")
+		return None
 
-# ✅ Hugging Face QA Pipelines
-qa_pipeline = pipeline("question-answering", model="distilbert-base-cased-distilled-squad")
-
-# ✅ Load Embedding Model
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token=huggingface_api_key) if huggingface_api_key else None
-
-# ✅ Robust Retrieval Pipeline with Error Handling
-try:
-    retrieval_pipeline = pipeline(
-        "question-answering",
-        model="deepset/roberta-base-squad2",
-        tokenizer="deepset/roberta-base-squad2"
-    )
-except Exception as e:
-    print(f"⚠️ Retrieval pipeline failed to load: {e}")
-    retrieval_pipeline = None  # Ensure code doesn't break
+_retrieval_pipeline = None
+def get_retrieval_pipeline():
+	global _retrieval_pipeline
+	if _retrieval_pipeline is not None:
+		return _retrieval_pipeline
+	try:
+		_retrieval_pipeline = pipeline(
+			"question-answering",
+			model="deepset/roberta-base-squad2",
+			tokenizer="deepset/roberta-base-squad2"
+		)
+		return _retrieval_pipeline
+	except Exception as e:
+		print(f"⚠️ Retrieval pipeline failed to load: {e}")
+		return None
 
 def generate_research_answer(context, query, retrieved_text):
     """Uses Gemini to generate research-focused answers based on retrieved text."""
@@ -108,6 +122,9 @@ def generate_research_answer(context, query, retrieved_text):
 
     try:
         print("[DEBUG] Sending prompt to Gemini model...")
+        gemini_model = get_gemini_model()
+        if gemini_model is None:
+            return "⚠️ Gemini model is not available. Please configure GOOGLE_API_KEY."
         response = gemini_model.generate_content(prompt)
         
         if response and response.text and response.text.strip():
@@ -166,6 +183,7 @@ def generate_answer_huggingface(query, retrieved_chunks, memory=None, image_text
 
         # ✅ Step 4: Extract most relevant text
         retrieved_text = ""
+        retrieval_pipeline = get_retrieval_pipeline()
         if retrieval_pipeline:
             try:
                 ret_result = retrieval_pipeline(question=query, context=combined_context)

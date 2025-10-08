@@ -2,12 +2,29 @@ import hashlib
 import os
 import streamlit as st
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "")
+# Safely resolve API keys from environment first, then Streamlit secrets only if a secrets.toml exists
+def _get_secret_or_env(secret_key, env_key):
+    env_value = os.getenv(env_key, "").strip()
+    if env_value:
+        return env_value
+    # Detect secrets.toml presence to avoid triggering Streamlit warnings locally
+    try:
+        cwd = os.getcwd()
+        project_secrets = os.path.join(cwd, ".streamlit", "secrets.toml")
+        home_dir = os.path.expanduser("~")
+        home_secrets = os.path.join(home_dir, ".streamlit", "secrets.toml")
+        if os.path.exists(project_secrets) or os.path.exists(home_secrets):
+            # Only touch st.secrets if a file actually exists
+            if hasattr(st, "secrets") and secret_key in st.secrets:
+                value = st.secrets[secret_key]
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+    except Exception:
+        pass
+    return ""
 
-# Optionally, you can set default values directly here if needed
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-HUGGINGFACE_API_KEY = st.secrets["HUGGINGFACE_API_KEY"]
+GOOGLE_API_KEY = _get_secret_or_env("GOOGLE_API_KEY", "GOOGLE_API_KEY")
+HUGGINGFACE_API_KEY = _get_secret_or_env("HUGGINGFACE_API_KEY", "HUGGINGFACE_API_KEY")
 
 def get_chunks_filename(pdf_path):
     """Generates a unique filename for text chunks based on the PDF path."""
